@@ -1,0 +1,10 @@
+{
+  "appTitle": "Flutter App",
+  "@appTitle": {
+    "description": "App title"
+  },
+  "genericError": "Something went wrong, please try again later.",
+  "@genericError": {
+    "description": "Generic error message shown when no specific message is available"
+  }
+}

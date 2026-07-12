@@ -1,0 +1,47 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+import 'package:{{package_name}}/core/bloc/bloc.dart';
+import 'package:{{package_name}}/core/effect/effect.dart';
+import 'package:{{package_name}}/features/{{feature_name}}/data/repositories/{{feature_name}}_repository.dart';
+
+part '{{feature_name}}_event.dart';
+part '{{feature_name}}_state.dart';
+part '{{feature_name}}_bloc.freezed.dart';
+
+/// {{FeatureName}} BLoC。
+///
+/// 通过 [BlocEffectMixin.emitEffect] 发出一次性 UI 副作用。
+/// 项目默认提供 [ToastEffect]、[DialogEffect]、[NavigationEffect]；
+/// 如需自定义 Effect，请在 `lib/core/effect/ui_effect.dart` 中新增 `final class`
+/// 并在页面层的 [EffectListener.onEffect] 中增加对应分支。
+///
+///
+/// {{FeatureName}} BLoC.
+///
+/// Emits one-time UI side effects via [BlocEffectMixin.emitEffect].
+/// The project provides [ToastEffect], [DialogEffect], and [NavigationEffect]
+/// out of the box. To add a custom effect, declare a new `final class` in
+/// `lib/core/effect/ui_effect.dart` and handle it in the page's
+/// [EffectListener.onEffect].
+class {{FeatureName}}Bloc extends Bloc<{{FeatureName}}Event, {{FeatureName}}State>
+    with
+        BlocAwaitMixin<{{FeatureName}}Event, {{FeatureName}}State>,
+        BlocEffectMixin<{{FeatureName}}State>,
+        BlocCancelTokenMixin<{{FeatureName}}State> {
+  /// 创建 BLoC。
+  ///
+  /// Creates the BLoC.
+  {{FeatureName}}Bloc({
+    required this.repository,
+  }) : super(const {{FeatureName}}State.initial());
+
+  /// {{FeatureName}} 仓库。
+  ///
+  /// {{FeatureName}} repository.
+  final {{FeatureName}}Repository repository;
+
+  // Future<void> _onAdd({{FeatureName}}Add event, Emitter<{{FeatureName}}State> emit) async {
+  //   //<code>
+  // }
+}

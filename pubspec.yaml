@@ -1,0 +1,25 @@
+name: fluzer
+description: Flutter Zero 模板项目一键创建工具 / CLI tool for scaffolding Flutter Zero projects
+version: 1.0.0
+# repository: https://github.com/my_org/my_repo
+
+environment:
+  sdk: ^3.12.2
+
+# 命令行工具依赖 / CLI dependencies
+dependencies:
+  analyzer: ^10.2.0       # AST 解析 / AST parsing for codemod_recipe
+  args: ^2.7.0          # 命令行参数解析 / Command-line argument parsing
+  codemod_recipe: ^0.1.0
+  mason_logger: ^0.3.5  # 彩色日志输出 / Colored console output
+  path: ^1.9.1          # 路径操作 / Path manipulation
+  yaml: ^3.1.2          # YAML 解析 / YAML parsing
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6
+
+# 注册可执行命令 / Register executable commands
+# dart pub global activate fluzer → fluzer new my_feature
+executables:
+  fluzer: main

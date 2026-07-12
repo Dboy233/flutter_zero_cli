@@ -1,0 +1,34 @@
+part of '{{feature_name}}_bloc.dart';
+
+/// {{FeatureName}} 状态。
+///
+/// 实现 [EffectState]，用于承载由 [BlocEffectMixin] 写入的一次性 UI 副作用。
+/// 项目默认提供 [ToastEffect]、[DialogEffect]、[NavigationEffect]；
+/// 自定义 Effect 需同步修改 `lib/core/effect/ui_effect.dart`。
+///
+///
+/// {{FeatureName}} state.
+///
+/// Implements [EffectState] to hold one-time UI side effects written by
+/// [BlocEffectMixin]. The project provides [ToastEffect], [DialogEffect],
+/// and [NavigationEffect] by default. Custom effects must be added to
+/// `lib/core/effect/ui_effect.dart`.
+@freezed
+abstract class {{FeatureName}}State extends EffectState with _${{FeatureName}}State {
+  /// 初始状态。
+  ///
+  /// Initial state.
+  const factory {{FeatureName}}State.initial({
+    /// 待消费的 UI 副作用。
+    ///
+    /// Pending UI effect.
+    UIEffect? effect,
+  }) = _Initial;
+
+  const {{FeatureName}}State._();
+
+  @override
+  {{FeatureName}}State copyWithEffect({UIEffect? effect}) {
+    return copyWith(effect: effect);
+  }
+}

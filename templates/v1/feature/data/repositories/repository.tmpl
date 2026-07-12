@@ -1,0 +1,25 @@
+import 'package:{{package_name}}/core/data/base_repository.dart';
+
+/// {{FeatureName}} 仓库。
+///
+/// {{FeatureName}} repository.
+class {{FeatureName}}Repository extends BaseRepository {
+  /// 创建仓库。
+  ///
+  /// Creates the repository.
+  const {{FeatureName}}Repository({required super.client});
+
+  // 请求列表示例 / Fetch list example:
+  // Future<List<{{FeatureName}}Model>> fetch{{FeatureName}}s() async {
+  //   final response = await client.get<List<dynamic>>('/{{feature_name}}s');
+  //   return parseList(response, {{FeatureName}}Model.fromJson);
+  // }
+
+  // 请求单条示例 / Fetch single example:
+  // Future<{{FeatureName}}Model?> fetch{{FeatureName}}() async {
+  //   final response = await client.get<Map<String, dynamic>>(
+  //     '/{{feature_name}}s/1',
+  //   );
+  //   return parseSingle(response, {{FeatureName}}Model.fromJson);
+  // }
+}

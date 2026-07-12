@@ -1,0 +1,53 @@
+# ──────────────────────────────────────────────────────────────────────
+#  代码分析配置 / Code Analysis Configuration
+# ──────────────────────────────────────────────────────────────────────
+#
+#  引用 very_good_analysis 严格规则集（~200+ 条），在此基础上禁用
+#  不适用于本模板项目的规则。
+#
+#  Includes the very_good_analysis strict ruleset (~200+ rules),
+#  with project-specific overrides below.
+# ──────────────────────────────────────────────────────────────────────
+
+include: package:very_good_analysis/analysis_options.yaml
+
+analyzer:
+  errors:
+    # 不强制使用 package: 导入，允许相对路径（模板项目内部文件）
+    # Don't force package: imports; relative paths allowed within the project
+    always_use_package_imports: ignore
+
+    # 不检查注释中的引用链接（如 [SomeClass]），避免噪音
+    # Don't validate doc comment references like [SomeClass]
+    comment_references: ignore
+
+    # 不强制 80 字符行宽限制，允许更长行
+    # Don't enforce 80-char line length limit
+    lines_longer_than_80_chars: ignore
+
+linter:
+  rules:
+    # ── 以下规则在本模板项目中全局禁用 ──
+    # ── Rules globally disabled for this template project ──
+
+    # 不要求每个公开成员都有 dartdoc 注释（模板项目噪音过大）
+    # Don't require dartdoc on every public member (too noisy for a template)
+    public_member_api_docs: false
+
+    # 允许显式声明局部变量类型（提升可读性，不强制类型推断省略）
+    # Allow explicit local variable types (readability over inference)
+    omit_local_variable_types: false
+
+    # 不强制使用级联语法（纯风格偏好，脚本/测试中降低可读性）
+    # Don't force cascade syntax (style preference, hurts readability in scripts/tests)
+    cascade_invocations: false
+
+    # 允许 switch 语句使用 default 分支（枚举扩展时需要兜底）
+    # Allow default cases in switch statements (needed for enum fallback)
+    no_default_cases: false
+
+    # ── 以下为可选启用项，按需取消注释 ──
+    # ── Optional rules below, uncomment as needed ──
+
+    # avoid_print: false  # 取消注释以禁用 avoid_print 规则 / Uncomment to allow print()
+    # prefer_single_quotes: true  # 取消注释以启用单引号偏好 / Uncomment to prefer single quotes
