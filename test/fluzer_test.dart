@@ -1,66 +1,93 @@
 // fluzer 单元测试 / Unit tests for fluzer
+//
+// 采用 hermetic 测试：模板砖与项目结构均在临时目录中构造，
+// 不依赖外部仓库或网络。
+//
+// Hermetic tests: bricks and project scaffolding are built in temp dirs,
+// no dependency on external repos or network.
 
 import 'dart:io';
 
 import 'package:codemod_recipe/codemod_recipe.dart';
-import 'package:fluzer/src/codemod/codemod_file_editor.dart';
+import 'package:fluzer/src/codemod/code_mod.dart';
 import 'package:fluzer/src/codemod/insert_at_method_end_transform.dart';
 import 'package:fluzer/src/codemod/ordered_import_transform.dart';
 import 'package:fluzer/src/config/project_config.dart';
-import 'package:fluzer/src/templates/feature_generator.dart';
-import 'package:fluzer/src/templates/template_engine.dart';
+import 'package:fluzer/src/template/brick_loader.dart';
+import 'package:fluzer/src/template/brick_renderer.dart';
+import 'package:fluzer/src/template/feature_generator.dart';
 import 'package:path/path.dart' as path;
 import 'package:test/test.dart';
 
+/// 在 [root] 下构造一个最小可用的 feature brick。
+Future<Directory> _buildFeatureBrick(Directory root) async {
+  final bricksRoot = Directory(path.join(root.path, 'bricks'));
+  final brickDir = Directory(path.join(bricksRoot.path, 'feature'));
+  final brickLib = Directory(
+    path.join(brickDir.path, '__brick__', 'lib', 'features', '{{name}}'),
+  );
+  await brickLib.create(recursive: true);
+
+  await File(path.join(brickDir.path, 'brick.yaml')).writeAsString('''
+name: feature
+description: test brick
+version: 0.1.0
+environment:
+  mason: ^0.1.2
+vars:
+  name:
+    type: string
+  package_name:
+    type: string
+''');
+
+  await File(path.join(brickLib.path, '{{name}}_model.dart')).writeAsString('''
+import 'package:{{package_name}}/core/network/dio_client.dart';
+
+// {{#pascalCase}}{{name}}{{/pascalCase}} 数据模型。
+class {{#pascalCase}}{{name}}{{/pascalCase}}Model {}
+''');
+  return bricksRoot;
+}
+
+/// 构造一个最小 flutter_zero 项目（含 injection_base.dart）。
+Future<Directory> _buildProject(Directory root) async {
+  final projectDir = Directory(path.join(root.path, 'project'));
+  await projectDir.create(recursive: true);
+
+  await File(path.join(projectDir.path, 'flutter_zero_config.yaml'))
+      .writeAsString('''
+version: "1.0.0"
+template_name: flutter_zero
+''');
+
+  await File(path.join(projectDir.path, 'pubspec.yaml'))
+      .writeAsString('name: test_app\n');
+
+  final injectionBase = File(
+    path.join(projectDir.path, 'lib', 'core', 'di', 'injection_base.dart'),
+  );
+  await injectionBase.create(recursive: true);
+  await injectionBase.writeAsString('''
+import 'get_it_instance.dart';
+
+abstract class InjectionBase {
+  Future<void> registerAll() async {
+    await registerFeatureModules();
+  }
+
+  Future<void> registerBaseDependencies();
+  Future<void> registerUserDependencies();
+
+  Future<void> registerFeatureModules() async {
+    // Register Feature Modules here, e.g.:
+  }
+}
+''');
+  return projectDir;
+}
+
 void main() {
-  group('TemplateEngine', () {
-    late Directory tempDir;
-    late TemplateEngine engine;
-
-    setUp(() {
-      tempDir = Directory.systemTemp.createTempSync('template_engine_test_');
-      engine = TemplateEngine(templatesDir: tempDir);
-    });
-
-    tearDown(() => tempDir.delete(recursive: true));
-
-    test('load 读取模板文件 / loads template file', () async {
-      final file = File(path.join(tempDir.path, 'hello.tmpl'));
-      await file.writeAsString('Hello {{name}}!');
-      final template = await engine.load('hello.tmpl');
-      expect(template, 'Hello {{name}}!');
-    });
-
-    test('load 不存在时抛出异常 / throws when template is missing', () async {
-      expect(() => engine.load('missing.tmpl'), throwsA(isA<StateError>()));
-    });
-
-    test('render 替换变量 / replaces variables', () {
-      final result = engine.render('Hello {{name}}!', {'name': 'Flutter'});
-      expect(result, 'Hello Flutter!');
-    });
-
-    test('render 多变量 / replaces multiple variables', () {
-      final result = engine.render('{{project_name}}/{{feature_name}}', {
-        'project_name': 'my_app',
-        'feature_name': 'user',
-      });
-      expect(result, 'my_app/user');
-    });
-
-    test('toPascalCase 转换 / converts to PascalCase', () {
-      expect(engine.toPascalCase('user_profile'), 'UserProfile');
-      expect(engine.toPascalCase('user'), 'User');
-      expect(engine.toPascalCase(''), '');
-    });
-
-    test('toCamelCase 转换 / converts to camelCase', () {
-      expect(engine.toCamelCase('user_profile'), 'userProfile');
-      expect(engine.toCamelCase('user'), 'user');
-      expect(engine.toCamelCase(''), '');
-    });
-  });
-
   group('OrderedImportTransform', () {
     test('dart import 插入到最前面 / inserts dart import first', () async {
       const source = "import 'package:meta/meta.dart';\n";
@@ -74,7 +101,7 @@ void main() {
     });
 
     test(
-      'relative import 插入到 package import 之后 / inserts relative import after package',
+      'relative import 插入到 package import 之后 / inserts relative after package',
       () async {
         const source =
             "import 'dart:async';\nimport 'package:meta/meta.dart';\n";
@@ -152,156 +179,117 @@ void main() {
     });
   });
 
-  group('CodemodFileEditor', () {
+  group('CodeMod (一键调用工具类)', () {
     late Directory tempDir;
     late File testFile;
 
     setUp(() {
-      tempDir = Directory.systemTemp.createTempSync(
-        'codemod_file_editor_test_',
-      );
+      tempDir = Directory.systemTemp.createTempSync('code_mod_test_');
       testFile = File(path.join(tempDir.path, 'test.dart'));
     });
 
     tearDown(() => tempDir.delete(recursive: true));
 
-    test('应用 transform 并写回文件 / applies transform and writes back', () async {
-      await testFile.writeAsString('class Foo {}\n');
-      final editor = CodemodFileEditor(testFile, format: false);
-      await editor.apply([
-        const OrderedImportTransform('package:test/test.dart'),
-      ]);
-
+    test('addImport 一键添加 import / one-call addImport', () async {
+      await testFile.writeAsString(
+        "import 'package:meta/meta.dart';\nclass Foo {}\n",
+      );
+      await CodeMod(testFile).addImport(
+        '../../features/user/user_module.dart',
+      );
       final content = await testFile.readAsString();
-      expect(content, contains("import 'package:test/test.dart';"));
+      expect(
+        content,
+        contains("import '../../features/user/user_module.dart';"),
+      );
     });
 
-    test('无补丁时不写文件 / does not write when no patches', () async {
-      await testFile.writeAsString('class Foo {}\n');
-
-      final editor = CodemodFileEditor(testFile, format: false);
-      await editor.apply([
-        const OrderedImportTransform('package:test/test.dart'),
-      ]);
-      await Future<void>.delayed(const Duration(milliseconds: 10));
-      await editor.apply([
-        const OrderedImportTransform('package:test/test.dart'),
-      ]);
-
+    test('insertAtMethodEnd 一键插入 / one-call insertAtMethodEnd', () async {
+      await testFile.writeAsString(
+        'class Foo { void bar() {} }\n',
+      );
+      await CodeMod(testFile).insertAtMethodEnd(
+        className: 'Foo',
+        methodName: 'bar',
+        code: '    print("x");\n',
+      );
       final content = await testFile.readAsString();
-      expect(content.split("import 'package:test/test.dart';").length - 1, 1);
+      expect(content, contains('print("x")'));
     });
   });
 
-  group('FeatureGenerator', () {
+  group('FeatureGenerator (Mason 集成)', () {
+    late Directory sandbox;
+    late Directory bricksRoot;
     late Directory projectDir;
-    late Directory templatesDir;
-    late TemplateEngine engine;
 
     setUp(() async {
-      final sourceTemplatesDir =
-          await TemplateEngine.resolvePackageTemplatesDirectory();
-      templatesDir = Directory.systemTemp.createTempSync(
-        'feature_generator_templates_',
-      );
-      await _copyDirectory(sourceTemplatesDir, templatesDir);
-      engine = TemplateEngine(templatesDir: templatesDir);
-
-      projectDir = Directory.systemTemp.createTempSync(
-        'feature_generator_project_',
-      );
-      await _createProjectStructure(projectDir);
+      sandbox = Directory.systemTemp.createTempSync('fluzer_feature_int_');
+      bricksRoot = await _buildFeatureBrick(sandbox);
+      projectDir = await _buildProject(sandbox);
     });
 
-    tearDown(() {
-      projectDir.delete(recursive: true);
-      templatesDir.delete(recursive: true);
-    });
+    tearDown(() => sandbox.delete(recursive: true));
 
-    test('生成功能模块并注册到 DI / generates feature module and registers DI', () async {
+    test('生成功能模块并注册到 DI / generates feature and registers DI', () async {
       final config = ProjectConfig(
         version: '1.0.0',
         projectRoot: projectDir.path,
         templateName: 'flutter_zero',
         packageName: 'test_app',
       );
-      final generator = FeatureGenerator(config: config, engine: engine);
+      final generator = FeatureGenerator(
+        config: config,
+        renderer: BrickRenderer(LocalBrickLoader(bricksRoot)),
+      );
       await generator.generate('user_profile');
 
-      final featureDir = Directory(
-        path.join(projectDir.path, 'lib', 'features', 'user_profile'),
+      // 文件已生成（pascalCase 由 brick 过滤器处理）
+      final modelFile = File(
+        path.join(
+          projectDir.path,
+          'lib',
+          'features',
+          'user_profile',
+          'user_profile_model.dart',
+        ),
       );
-      expect(featureDir.existsSync(), isTrue);
-
-      final moduleFile = File(
-        path.join(featureDir.path, 'user_profile_module.dart'),
+      expect(modelFile.existsSync(), isTrue);
+      final modelContent = await modelFile.readAsString();
+      expect(modelContent, contains('class UserProfileModel'));
+      expect(
+        modelContent,
+        contains("import 'package:test_app/core/network/dio_client.dart';"),
       );
-      expect(moduleFile.existsSync(), isTrue);
-      final moduleContent = await moduleFile.readAsString();
-      expect(moduleContent, contains('class UserProfileModule'));
 
+      // DI 注册（import + 注册语句，幂等）
       final injectionBase = File(
         path.join(projectDir.path, 'lib', 'core', 'di', 'injection_base.dart'),
       );
       final injectionContent = await injectionBase.readAsString();
       expect(
         injectionContent,
-        contains(
-          "import '../../features/user_profile/user_profile_module.dart';",
-        ),
+        contains("import '../../features/user_profile/user_profile_module.dart';"),
       );
       expect(injectionContent, contains('UserProfileModule.register(getIt);'));
     });
+
+    test('重复生成应报错 / duplicate generation throws', () async {
+      final config = ProjectConfig(
+        version: '1.0.0',
+        projectRoot: projectDir.path,
+        templateName: 'flutter_zero',
+        packageName: 'test_app',
+      );
+      final generator = FeatureGenerator(
+        config: config,
+        renderer: BrickRenderer(LocalBrickLoader(bricksRoot)),
+      );
+      await generator.generate('user_profile');
+      expect(
+        () => generator.generate('user_profile'),
+        throwsA(isA<CliException>()),
+      );
+    });
   });
-}
-
-Future<void> _copyDirectory(Directory source, Directory destination) async {
-  await destination.create(recursive: true);
-  await for (final entity in source.list(
-    recursive: false,
-    followLinks: false,
-  )) {
-    final newPath = path.join(destination.path, path.basename(entity.path));
-    if (entity is Directory) {
-      await _copyDirectory(entity, Directory(newPath));
-    } else if (entity is File) {
-      await entity.copy(newPath);
-    }
-  }
-}
-
-Future<void> _createProjectStructure(Directory projectDir) async {
-  final configFile = File(
-    path.join(projectDir.path, 'flutter_zero_config.yaml'),
-  );
-  await configFile.writeAsString('''
-version: "1.0.0"
-template_name: flutter_zero
-''');
-
-  final pubspecFile = File(path.join(projectDir.path, 'pubspec.yaml'));
-  await pubspecFile.writeAsString('''
-name: test_app
-''');
-
-  final injectionBaseFile = File(
-    path.join(projectDir.path, 'lib', 'core', 'di', 'injection_base.dart'),
-  );
-  await injectionBaseFile.create(recursive: true);
-  await injectionBaseFile.writeAsString('''
-import 'get_it_instance.dart';
-
-abstract class InjectionBase {
-  Future<void> registerAll() async {
-    await registerFeatureModules();
-  }
-
-  Future<void> registerBaseDependencies();
-  Future<void> registerUserDependencies();
-
-  Future<void> registerFeatureModules() async {
-    // Register Feature Modules here, e.g.:
-  }
-}
-''');
 }

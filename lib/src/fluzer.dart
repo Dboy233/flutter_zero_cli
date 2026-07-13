@@ -8,6 +8,7 @@ import 'package:mason_logger/mason_logger.dart';
 
 import 'commands/create_command.dart';
 import 'commands/new_command.dart';
+import 'commands/version_command.dart';
 
 /// CLI 主类，注册并分发命令 / Main CLI class, registers and dispatches commands
 class Fluzer {
@@ -25,7 +26,8 @@ class Fluzer {
                 'A CLI tool for scaffolding Flutter MVI projects.',
           )
           ..addCommand(CreateCommand(logger: logger))
-          ..addCommand(NewCommand(logger: logger));
+          ..addCommand(NewCommand(logger: logger))
+          ..addCommand(VersionCommand(logger: logger));
 
     try {
       final result = await runner.run(arguments);

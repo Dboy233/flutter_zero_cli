@@ -4,8 +4,10 @@ import 'package:args/command_runner.dart';
 import 'package:mason_logger/mason_logger.dart';
 
 import '../config/project_config.dart';
-import '../templates/feature_generator.dart';
-import '../templates/template_engine.dart';
+import '../template/brick_loader.dart';
+import '../template/brick_renderer.dart';
+import '../template/feature_generator.dart';
+import '../template/template_source.dart';
 
 /// build_runner 执行器签名。
 ///
@@ -14,26 +16,27 @@ typedef BuildRunnerRunner = Future<int> Function(String projectRoot);
 
 /// `new` 命令：在当前 flutter_zero 模板项目中生成功能模块。
 ///
-///
-/// `new` command: generates a feature module in the current
-/// flutter_zero template project.
+/// `new` command: generates a feature module in the current flutter_zero
+/// template project.
 class NewCommand extends Command<int> {
   /// 创建 NewCommand 实例。
   ///
-  /// [templatesDir] 用于测试注入模板目录；
-  /// [buildRunner] 用于测试注入 build_runner 执行器；
-  /// 未提供时通过 `package:fluzer` 自动解析 / 使用默认实现。
+  /// [loader] 用于注入 Brick 加载器（测试可用本地临时目录）；
+  /// [buildRunner] 用于注入 build_runner 执行器；
+  /// 二者均省略时按环境变量自动解析 / 使用默认实现。
   ///
   /// Creates a NewCommand instance.
   ///
-  /// [templatesDir] is for testing template resolution;
-  /// [buildRunner] is for testing build_runner execution;
-  /// when omitted, they resolve from the package root / use defaults.
+  /// [loader] injects a [BrickLoader] (tests use a temp local dir);
+  /// [buildRunner] injects the build_runner executor;
+  /// when omitted they resolve from env / use defaults.
   NewCommand({
     Logger? logger,
-    this._templatesDir,
+    BrickLoader? loader,
     BuildRunnerRunner? buildRunner,
-  }) : _logger = logger ?? Logger(),
+  }) :        _logger = logger ?? Logger(),
+       // ignore: prefer_initializing_formals
+       _loader = loader,
        _buildRunner = buildRunner ?? _defaultBuildRunner {
     argParser.addFlag(
       'build-runner',
@@ -46,7 +49,7 @@ class NewCommand extends Command<int> {
   }
 
   final Logger _logger;
-  final Directory? _templatesDir;
+  final BrickLoader? _loader;
   final BuildRunnerRunner _buildRunner;
 
   @override
@@ -66,14 +69,10 @@ class NewCommand extends Command<int> {
 
     try {
       final config = await ProjectConfig.load();
-      final templatesDir =
-          _templatesDir ??
-          await TemplateEngine.resolvePackageTemplatesDirectory(
-            version: config.version,
-          );
+      final brickLoader = _loader ?? await resolveBrickLoader();
       final generator = FeatureGenerator(
         config: config,
-        engine: TemplateEngine(templatesDir: templatesDir),
+        renderer: BrickRenderer(brickLoader),
       );
 
       await generator.generate(featureName);

@@ -1,19 +1,16 @@
 import 'dart:io';
 
-import 'package:codemod_recipe/codemod_recipe.dart';
-
-import 'codemod_file_editor.dart';
-import 'insert_at_method_end_transform.dart';
-import 'ordered_import_transform.dart';
+import '../util/string_case.dart';
+import 'code_mod.dart';
 
 /// 在模板项目的 `lib/core/di/injection_base.dart` 中注册一个 Feature Module。
 ///
-/// 通过 AST 精准定位 `InjectionBase.registerFeatureModules()`，
-/// 插入 import 与 `<FeatureModule>.register(getIt);` 语句。
+/// 底层复用 [CodeMod] 的两个一键操作：添加 import 与在
+/// `InjectionBase.registerFeatureModules()` 末尾插入注册语句。
 ///
 /// Registers a feature module in `lib/core/di/injection_base.dart`.
-/// Uses AST to locate `InjectionBase.registerFeatureModules()` and inserts
-/// the import and `<FeatureModule>.register(getIt);` statement.
+/// Uses [CodeMod]'s two one-call operations: add import and insert a
+/// registration statement at the end of `InjectionBase.registerFeatureModules()`.
 class FeatureRegistration {
   /// 创建注册器。
   ///
@@ -38,16 +35,14 @@ class FeatureRegistration {
   ///
   /// Applies the registration to [injectionBaseFile].
   Future<void> applyTo(File injectionBaseFile) async {
-    final editor = CodemodFileEditor(injectionBaseFile);
-    await editor.apply([
-      OrderedImportTransform(_importUri),
-      InsertAtMethodEndTransform(
-        className: 'InjectionBase',
-        methodName: 'registerFeatureModules',
-        code:
-            '    $_moduleClass.register(getIt); // Generated for $featureName\n',
-        skipIfContains: '$_moduleClass.register(getIt)',
-      ),
-    ]);
+    final mod = CodeMod(injectionBaseFile);
+    await mod.addImport(_importUri);
+    await mod.insertAtMethodEnd(
+      className: 'InjectionBase',
+      methodName: 'registerFeatureModules',
+      code:
+          '    $_moduleClass.register(getIt); // Generated for $featureName\n',
+      skipIfContains: '$_moduleClass.register(getIt)',
+    );
   }
 }

@@ -9,8 +9,11 @@ environment:
 # 命令行工具依赖 / CLI dependencies
 dependencies:
   analyzer: ^10.2.0       # AST 解析 / AST parsing for codemod_recipe
+  archive: ^4.0.9
   args: ^2.7.0          # 命令行参数解析 / Command-line argument parsing
   codemod_recipe: ^0.1.0
+  http: ^1.6.0
+  mason: ^0.1.2
   mason_logger: ^0.3.5  # 彩色日志输出 / Colored console output
   path: ^1.9.1          # 路径操作 / Path manipulation
   yaml: ^3.1.2          # YAML 解析 / YAML parsing
@@ -22,4 +25,4 @@ dev_dependencies:
 # 注册可执行命令 / Register executable commands
 # dart pub global activate fluzer → fluzer new my_feature
 executables:
-  fluzer: main
+  fluzer: fluzer
