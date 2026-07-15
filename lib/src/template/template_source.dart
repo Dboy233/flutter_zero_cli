@@ -14,7 +14,7 @@
 // - 发布前请将 [_templateRegistryUrl] 与 [_defaultTemplateZipUrl] 替换为真实地址。
 // - registry 采用"兼容性桶"结构：每条记录代表一个 `minCliVersion` 级别下的最新
 //   模板快照；模板发 PATCH/MINOR 只更新该记录的 `version`/`url`，发 MAJOR 才新增记录。
-//   详见 `flutter_zero_template/template_registry.json` 与 `VERSIONING.md`。
+//   详见 `flutter_zero_template/template_registry.json` 与 `VERSIONING_CLI.md`。
 
 import 'dart:convert';
 import 'dart:io';
