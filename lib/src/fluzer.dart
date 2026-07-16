@@ -35,6 +35,14 @@ class Fluzer {
     } on UsageException catch (e) {
       logger.err(e.message);
       return ExitCode.usage.code;
+    } on Object catch (e) {
+      // 兜底：任何未被命令自身捕获的异常（如参数解析期、命令构造期、
+      // 或命令遗漏捕获的运行时错误），统一以退出码 1 返回并给出友好提示，
+      // 避免泄漏内部堆栈并以 255 退出。
+      logger
+        ..err('执行出错 / An unexpected error occurred:')
+        ..err('$e');
+      return 1;
     }
   }
 }

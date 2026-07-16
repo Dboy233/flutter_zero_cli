@@ -8,14 +8,19 @@
 
 import 'dart:io';
 
+import 'package:args/command_runner.dart';
 import 'package:codemod_recipe/codemod_recipe.dart';
 import 'package:fluzer/src/codemod/code_mod.dart';
 import 'package:fluzer/src/codemod/insert_at_method_end_transform.dart';
 import 'package:fluzer/src/codemod/ordered_import_transform.dart';
+import 'package:fluzer/src/commands/create_command.dart';
+import 'package:fluzer/src/commands/new_command.dart';
+import 'package:fluzer/src/commands/version_command.dart';
 import 'package:fluzer/src/config/project_config.dart';
 import 'package:fluzer/src/template/brick_loader.dart';
 import 'package:fluzer/src/template/brick_renderer.dart';
 import 'package:fluzer/src/template/feature_generator.dart';
+import 'package:fluzer/src/version/version_check.dart';
 import 'package:path/path.dart' as path;
 import 'package:test/test.dart';
 
@@ -85,6 +90,34 @@ abstract class InjectionBase {
 }
 ''');
   return projectDir;
+}
+
+/// 在 [root] 下构造一个最小可用的 project brick（用于 create 命令测试）。
+///
+/// Builds a minimal `project` brick under [root] for `create` command tests.
+Future<Directory> _buildProjectBrick(Directory root) async {
+  final bricksRoot = Directory(path.join(root.path, 'bricks'));
+  final brickDir = Directory(path.join(bricksRoot.path, 'project'));
+  final brickLib = Directory(
+    path.join(brickDir.path, '__brick__', '{{name}}'),
+  );
+  await brickLib.create(recursive: true);
+
+  await File(path.join(brickDir.path, 'brick.yaml')).writeAsString('''
+name: project
+description: test project brick
+version: 0.1.0
+environment:
+  mason: ^0.1.2
+vars:
+  name:
+    type: string
+''');
+
+  await File(path.join(brickLib.path, 'pubspec.yaml')).writeAsString('''
+name: {{name}}
+''');
+  return bricksRoot;
 }
 
 void main() {
@@ -290,6 +323,207 @@ void main() {
         () => generator.generate('user_profile'),
         throwsA(isA<CliException>()),
       );
+    });
+  });
+
+  group('Command layer (create/new/version)', () {
+    CommandRunner<int> runnerWith(Command<int> cmd) =>
+        CommandRunner<int>('fluzer', 'test')..addCommand(cmd);
+
+    // -----------------------------------------------------------------------
+    // create 命令：参数校验 / 错误路径 / 完整流程
+    // -----------------------------------------------------------------------
+    group('CreateCommand', () {
+      late Directory sandbox;
+      late Directory originalCwd;
+
+      setUp(() {
+        sandbox = Directory.systemTemp.createTempSync('fluzer_create_cmd_');
+        originalCwd = Directory.current;
+        // create 命令以 Directory.current 为基准拼接目标目录
+        Directory.current = sandbox;
+      });
+
+      tearDown(() {
+        Directory.current = originalCwd;
+        sandbox.deleteSync(recursive: true);
+      });
+
+      test('缺少项目名 → 返回 1 / missing project name returns 1', () async {
+        final code = await runnerWith(CreateCommand()).run(['create']);
+        expect(code, 1);
+      });
+
+      test('非法项目名 → 返回 1 / invalid project name returns 1', () async {
+        final code =
+            await runnerWith(CreateCommand()).run(['create', 'Bad-Name']);
+        expect(code, 1);
+      });
+
+      test('目标目录已存在 → 返回 1 / existing target dir returns 1', () async {
+        Directory(path.join(sandbox.path, 'existing_app')).createSync();
+        final code = await runnerWith(CreateCommand())
+            .run(['create', 'existing_app']);
+        expect(code, 1);
+      });
+
+      test(
+        '完整流程（注入运行时）→ 返回 0 并生成项目 / full flow returns 0',
+        () async {
+          final bricksRoot = await _buildProjectBrick(sandbox);
+          final cmd = CreateCommand(
+            loader: LocalBrickLoader(bricksRoot),
+            flutterCreate: (_, {String? projectName, String? org}) async => 0,
+            flutterPubGet: (_) async => 0,
+            flutterGenL10n: (_) async => 0,
+            buildRunner: (_) async => 0,
+          );
+          final code = await runnerWith(cmd)
+              .run(['create', 'my_app', '--no-build-runner']);
+          expect(code, 0);
+          final pubspec = File(
+            path.join(sandbox.path, 'my_app', 'pubspec.yaml'),
+          );
+          expect(pubspec.existsSync(), isTrue);
+        },
+      );
+
+      test(
+        'flutter create 失败 → 返回 1 并清理半成品 / '
+        'flutter create failure returns 1 and cleans up',
+        () async {
+          final bricksRoot = await _buildProjectBrick(sandbox);
+          final cmd = CreateCommand(
+            loader: LocalBrickLoader(bricksRoot),
+            flutterCreate: (_, {String? projectName, String? org}) async => 1,
+            flutterPubGet: (_) async => 0,
+            flutterGenL10n: (_) async => 0,
+            buildRunner: (_) async => 0,
+          );
+          final code = await runnerWith(cmd)
+              .run(['create', 'fail_app', '--no-build-runner']);
+          expect(code, 1);
+          // 失败后应清理半成品目录
+          expect(
+            Directory(path.join(sandbox.path, 'fail_app')).existsSync(),
+            isFalse,
+          );
+        },
+      );
+    });
+
+    // -----------------------------------------------------------------------
+    // new 命令：参数校验 / 完整流程（注入 loader，跳过网络）
+    // -----------------------------------------------------------------------
+    group('NewCommand', () {
+      late Directory sandbox;
+      late Directory originalCwd;
+      late Directory bricksRoot;
+      late Directory projectDir;
+
+      setUp(() async {
+        sandbox = Directory.systemTemp.createTempSync('fluzer_new_cmd_');
+        bricksRoot = await _buildFeatureBrick(sandbox);
+        projectDir = await _buildProject(sandbox);
+        originalCwd = Directory.current;
+        // new 命令通过 ProjectConfig.load() 从当前目录向上查找工程
+        Directory.current = projectDir;
+      });
+
+      tearDown(() {
+        Directory.current = originalCwd;
+        sandbox.deleteSync(recursive: true);
+      });
+
+      test('缺少功能名 → 返回 1 / missing feature name returns 1', () async {
+        final code = await runnerWith(NewCommand()).run(['new']);
+        expect(code, 1);
+      });
+
+      test(
+        '完整流程（注入 loader）→ 返回 0 并注册 DI / '
+        'full flow returns 0 and registers DI',
+        () async {
+          final cmd = NewCommand(
+            loader: LocalBrickLoader(bricksRoot),
+            buildRunner: (_) async => 0,
+          );
+          final code = await runnerWith(cmd).run(['new', 'user_profile']);
+          expect(code, 0);
+
+          final modelFile = File(
+            path.join(
+              projectDir.path,
+              'lib',
+              'features',
+              'user_profile',
+              'user_profile_model.dart',
+            ),
+          );
+          expect(modelFile.existsSync(), isTrue);
+
+          final injection = File(
+            path.join(
+              projectDir.path,
+              'lib',
+              'core',
+              'di',
+              'injection_base.dart',
+            ),
+          );
+          final content = await injection.readAsString();
+          expect(content, contains('UserProfileModule.register(getIt);'));
+        },
+      );
+    });
+
+    // -----------------------------------------------------------------------
+    // version 命令：注入 checkForUpdate，覆盖三条分支
+    // -----------------------------------------------------------------------
+    group('VersionCommand', () {
+      test('有可用更新 → 返回 0 / update available returns 0', () async {
+        var called = false;
+        final result = VersionCheckResult(
+          current: '1.0.0',
+          latest: '1.1.0',
+          hasUpdate: true,
+          packageName: 'fluzer',
+        );
+        final code = await runnerWith(
+          VersionCommand(
+            checkForUpdateFn: () async {
+              called = true;
+              return result;
+            },
+          ),
+        ).run(['version']);
+        expect(code, 0);
+        expect(called, isTrue);
+      });
+
+      test('已是最新 → 返回 0 / up to date returns 0', () async {
+        final result = VersionCheckResult(
+          current: '1.0.0',
+          latest: '1.0.0',
+          hasUpdate: false,
+          packageName: 'fluzer',
+        );
+        final code = await runnerWith(
+          VersionCommand(checkForUpdateFn: () async => result),
+        ).run(['version']);
+        expect(code, 0);
+      });
+
+      test('无法检查 → 静默降级返回 0 / unavailable degrades to 0', () async {
+        final result = VersionCheckResult.unavailable(
+          current: '1.0.0',
+          packageName: 'fluzer',
+        );
+        final code = await runnerWith(
+          VersionCommand(checkForUpdateFn: () async => result),
+        ).run(['version']);
+        expect(code, 0);
+      });
     });
   });
 }

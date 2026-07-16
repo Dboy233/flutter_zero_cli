@@ -74,7 +74,9 @@ Future<BrickLoader> resolveBrickLoader() async {
 /// Selects the version-compatible template zip URL from the registry.
 Future<String> _selectTemplateZipUrl() async {
   try {
-    final response = await http.get(Uri.parse(_templateRegistryUrl));
+    final response = await http
+        .get(Uri.parse(_templateRegistryUrl))
+        .timeout(const Duration(seconds: 3));
     if (response.statusCode != 200) return _defaultTemplateZipUrl;
     final json = jsonDecode(response.body) as Map<String, dynamic>;
     final templates = (json['templates'] as List?) ?? <dynamic>[];

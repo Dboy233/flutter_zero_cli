@@ -8,14 +8,35 @@ import 'package:mason_logger/mason_logger.dart';
 import '../template/template_source.dart';
 import '../version/version_check.dart';
 
+/// 可注入的更新检查函数，便于测试。
+///
+/// 默认实现为 [checkForUpdate]（查询 pub.dev，带缓存与静默降级）。
+///
+/// Injectable update-check function for testability.
+/// Defaults to [checkForUpdate] (queries pub.dev with cache & silent fallback).
+typedef CheckForUpdate = Future<VersionCheckResult> Function();
+
 /// `version` 命令：查看版本并检查更新。
 ///
 /// `version` command: show version and check for updates.
 class VersionCommand extends Command<int> {
-  /// 创建 VersionCommand 实例 / Creates a VersionCommand instance.
-  VersionCommand({Logger? logger}) : _logger = logger ?? Logger();
+  /// 创建 VersionCommand 实例。
+  ///
+  /// [checkForUpdateFn] 可注入更新检查实现（测试用），省略时回落到
+  /// 顶层的 [checkForUpdate]（查询 pub.dev）。
+  ///
+  /// Creates a VersionCommand instance.
+  ///
+  /// [checkForUpdateFn] injects the update-check impl (for tests);
+  /// when omitted it falls back to the top-level [checkForUpdate].
+  VersionCommand({
+    Logger? logger,
+    CheckForUpdate? checkForUpdateFn,
+  })  : _logger = logger ?? Logger(),
+        _checkForUpdate = checkForUpdateFn ?? checkForUpdate;
 
   final Logger _logger;
+  final CheckForUpdate _checkForUpdate;
 
   @override
   String get name => 'version';
@@ -28,7 +49,7 @@ class VersionCommand extends Command<int> {
   Future<int> run() async {
     _logger.info('fluzer $cliVersion');
 
-    final result = await checkForUpdate();
+    final result = await _checkForUpdate();
     if (!result.available) {
       _logger.info('（无法检查更新：包尚未发布或网络异常）');
       return 0;
