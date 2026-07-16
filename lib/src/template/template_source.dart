@@ -16,6 +16,7 @@
 //   模板快照；模板发 PATCH/MINOR 只更新该记录的 `version`/`url`，发 MAJOR 才新增记录。
 //   详见 `flutter_zero_template/template_registry.json` 与 `VERSIONING_CLI.md`。
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -34,7 +35,7 @@ const String cliVersion = '1.0.0';
 /// `https://raw.githubusercontent.com/<owner>/<repo>/main/template_registry.json`
 /// Remote registry URL (replace with the real raw URL before publishing).
 const String _templateRegistryUrl =
-    'https://raw.githubusercontent.com/<owner>/<repo>/main/template_registry.json';
+    'https://raw.githubusercontent.com/Dboy233/flutter_zero_template/main/template_registry.json';
 
 /// 内置兜底模板 zip 地址（registry 拉取失败时使用）。
 ///
@@ -42,7 +43,14 @@ const String _templateRegistryUrl =
 /// `https://github.com/<owner>/<repo>/releases/download/v1.0.0/bricks.zip`
 /// Built-in fallback template zip URL (used when registry fetch fails).
 const String _defaultTemplateZipUrl =
-    'https://github.com/<owner>/<repo>/releases/download/v1.0.0/bricks.zip';
+    'https://github.com/Dboy233/flutter_zero_template/releases/download/1.0.0/bricks.zip';
+
+/// 国内 GitHub 镜像降级地址（当 GitHub 原始地址请求超时时使用）。
+///
+/// 规则：前缀 + 原始 URL，例如 `https://ghfast.top/https://github.com/...`。
+///
+/// 链接失效的时候通过 https://ghproxy.link/ 查看最新地址。
+const String _githubMirrorFallback = 'https://ghfast.top/';
 
 /// 解析当前应使用的 [BrickLoader]。
 ///
@@ -63,22 +71,27 @@ Future<BrickLoader> resolveBrickLoader() async {
   }
 
   // 3. 远程：从 registry 选出版本兼容的模板 zip URL（失败回退内置默认值）。
-  return RemoteBrickLoader(zipUrl: await _selectTemplateZipUrl());
+  return RemoteBrickLoader(
+    zipUrl: await _selectTemplateZipUrl(),
+    mirrorFallback: _githubMirrorFallback,
+  );
 }
 
 /// 从 registry 选出版本兼容的模板 zip URL。
 ///
 /// 遍历 `templates`，在所有 `minCliVersion <= [cliVersion]` 的记录中，
 /// 选取 `version` 最大者的 `url`；无匹配或拉取失败时回退 [_defaultTemplateZipUrl]。
+/// 当 GitHub 原始地址超时时，会尝试用 [_githubMirrorFallback] 前缀重试。
 ///
 /// Selects the version-compatible template zip URL from the registry.
 Future<String> _selectTemplateZipUrl() async {
   try {
-    final response = await http
-        .get(Uri.parse(_templateRegistryUrl))
-        .timeout(const Duration(seconds: 3));
-    if (response.statusCode != 200) return _defaultTemplateZipUrl;
-    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final json = await _fetchWithMirrorFallback(
+      _templateRegistryUrl,
+      (response) => jsonDecode(response.body) as Map<String, dynamic>,
+    );
+    if (json == null) return _defaultTemplateZipUrl;
+
     final templates = (json['templates'] as List?) ?? <dynamic>[];
     var bestUrl = _defaultTemplateZipUrl;
     var bestVersion = _Version.zero;
@@ -95,6 +108,35 @@ Future<String> _selectTemplateZipUrl() async {
     return bestUrl;
   } on Object {
     return _defaultTemplateZipUrl;
+  }
+}
+
+/// 尝试请求 [url]，若 GitHub 原始地址超时，则使用 [_githubMirrorFallback] 前缀重试。
+///
+/// 仅对 [TimeoutException] 进行降级；其它异常（如 404、DNS 错误）直接返回 null，
+/// 让外层回退到 [_defaultTemplateZipUrl]。
+Future<T?> _fetchWithMirrorFallback<T>(
+  String url,
+  T? Function(http.Response) parse,
+) async {
+  Future<T?> tryFetch(String target) async {
+    final response = await http
+        .get(Uri.parse(target))
+        .timeout(const Duration(seconds: 3));
+    if (response.statusCode != 200) return null;
+    return parse(response);
+  }
+
+  try {
+    return await tryFetch(url);
+  } on TimeoutException {
+    try {
+      return await tryFetch('$_githubMirrorFallback$url');
+    } on Object {
+      return null;
+    }
+  } on Object {
+    return null;
   }
 }
 

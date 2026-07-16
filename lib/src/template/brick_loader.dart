@@ -5,6 +5,7 @@
 // - [LocalBrickLoader]：从本地目录读取（测试 / 开发阶段）。
 // - [RemoteBrickLoader]：从 GitHub 下载 zip 解压后读取（线上版本）。
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
@@ -66,11 +67,14 @@ class RemoteBrickLoader extends BrickLoader {
   /// 创建远程加载器。
   ///
   /// [zipUrl] 为模板仓库的 zip 下载链接（如 GitHub release / archive 链接）。
+  /// [mirrorFallback] 为可选的镜像前缀：当原始 [zipUrl] 请求超时时，会尝试
+  /// 用 `$mirrorFallback$zipUrl` 重新下载（例如 `https://ghfast.top/`）。
   ///
   /// Creates a remote loader. [zipUrl] is the zip download URL of the
   /// template repository (e.g. a GitHub release or archive link).
   RemoteBrickLoader({
     required this.zipUrl,
+    this.mirrorFallback,
     Directory? cacheDir,
   }) : cacheDir =
             cacheDir ?? Directory(p.join(Directory.systemTemp.path, 'fluzer_cache')),
@@ -80,6 +84,11 @@ class RemoteBrickLoader extends BrickLoader {
   ///
   /// Template zip download URL.
   final String zipUrl;
+
+  /// 可选的镜像降级前缀（用于原始地址超时的情况）。
+  ///
+  /// Optional mirror prefix used when the original [zipUrl] times out.
+  final String? mirrorFallback;
 
   /// 缓存根目录。
   ///
@@ -106,13 +115,14 @@ class RemoteBrickLoader extends BrickLoader {
 
   /// 确保 zip 已下载并解压，返回其中的 `bricks` 目录。
   ///
+  /// 若原始 [zipUrl] 请求超时且提供了 [mirrorFallback]，则尝试镜像地址。
   /// Ensures the zip is downloaded and extracted, returning the `bricks`
   /// directory inside it.
   Future<Directory> _resolveBricksRoot() async {
     final extractDir = Directory(p.join(cacheDir.path, cacheKey));
     if (extractDir.existsSync()) return _findBricksDir(extractDir);
 
-    final response = await http.get(Uri.parse(zipUrl));
+    final response = await _getWithMirrorFallback(zipUrl);
     if (response.statusCode != 200) {
       throw CliException(
         '模板下载失败（HTTP ${response.statusCode}）：\n'
@@ -130,6 +140,19 @@ class RemoteBrickLoader extends BrickLoader {
       }
     }
     return _findBricksDir(extractDir);
+  }
+
+  /// 请求 [url]，当 [TimeoutException] 且存在 [mirrorFallback] 时，用镜像前缀重试。
+  Future<http.Response> _getWithMirrorFallback(String url) async {
+    try {
+      return await http.get(Uri.parse(url)).timeout(const Duration(seconds: 30));
+    } on TimeoutException {
+      final mirror = mirrorFallback;
+      if (mirror == null || mirror.isEmpty) rethrow;
+      return await http
+          .get(Uri.parse('$mirror$url'))
+          .timeout(const Duration(seconds: 30));
+    }
   }
 
   /// 在解压树中定位 `bricks` 目录（兼容 zip 顶层多一层仓库目录的情况）。
