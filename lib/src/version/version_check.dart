@@ -10,9 +10,14 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 
-import '../template/template_source.dart';
+import '../template/template_config.dart';
+
+/// 模块级复用的 Dio 实例（用于 pub.dev 版本查询）。
+///
+/// Shared Dio instance for pub.dev version queries.
+final Dio _dio = Dio();
 
 /// 默认查询的 pub.dev 包名 / Default pub.dev package name to check.
 const String cliPackageName = 'fluzer';
@@ -79,16 +84,21 @@ Future<VersionCheckResult> checkForUpdate({
   }
 
   try {
-    final response = await http
-        .get(Uri.parse('https://pub.dev/api/packages/$packageName'))
-        .timeout(const Duration(seconds: 3));
+    final response = await _dio.get<dynamic>(
+      'https://pub.dev/api/packages/$packageName',
+      options: Options(
+        responseType: ResponseType.json,
+        receiveTimeout: const Duration(seconds: 3),
+        validateStatus: (_) => true,
+      ),
+    );
     if (response.statusCode != 200) {
       return VersionCheckResult.unavailable(
         current: cliVersion,
         packageName: packageName,
       );
     }
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = response.data as Map<String, dynamic>;
     final latest = (data['latest']?['version'] as String?) ?? cliVersion;
     _writeCache(packageName, latest);
     return VersionCheckResult(

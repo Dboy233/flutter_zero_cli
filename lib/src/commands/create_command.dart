@@ -150,7 +150,7 @@ class CreateCommand extends Command<int> {
       }
 
       _step('步骤 2/8：用 Mason 渲染 project 模板 ...');
-      final brickLoader = _loader ?? await resolveBrickLoader();
+      final brickLoader = _loader ?? await resolveBrickLoader(logger: _logger);
       final staging = Directory.systemTemp.createTempSync('fluzer_create_');
       final renderer = BrickRenderer(brickLoader);
       await renderer.generate(

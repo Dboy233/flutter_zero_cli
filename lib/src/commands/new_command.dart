@@ -69,7 +69,7 @@ class NewCommand extends Command<int> {
 
     try {
       final config = await ProjectConfig.load();
-      final brickLoader = _loader ?? await resolveBrickLoader();
+      final brickLoader = _loader ?? await resolveBrickLoader(logger: _logger);
       final generator = FeatureGenerator(
         config: config,
         renderer: BrickRenderer(brickLoader),

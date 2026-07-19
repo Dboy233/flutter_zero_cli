@@ -5,11 +5,10 @@
 // - [LocalBrickLoader]：从本地目录读取（测试 / 开发阶段）。
 // - [RemoteBrickLoader]：从 GitHub 下载 zip 解压后读取（线上版本）。
 
-import 'dart:async';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import 'package:mason/mason.dart';
 import 'package:path/path.dart' as p;
 
@@ -58,47 +57,77 @@ class LocalBrickLoader extends BrickLoader {
 /// 远程 Brick 加载器（线上版本）。
 ///
 /// 从 [zipUrl] 下载 zip 并解压到缓存目录，加载其中 `bricks/<brickName>`
-/// 目录。下载结果按 [zipUrl] 哈希缓存，不同版本不会相互覆盖。
+/// 目录。下载结果按模板版本号缓存（`template_<版本号>`），不同版本互不覆盖；
+/// 若未知版本号（如环境变量覆盖 / 回退默认地址），则退化为按 [zipUrl] 哈希缓存。
 ///
 /// Remote brick loader (production). Downloads a zip from [zipUrl], extracts
 /// it into a cache directory, and loads `bricks/<brickName>` from it.
-/// Results are cached by a hash of [zipUrl] so different versions don't clash.
+/// Results are cached by template version (`template_<version>`); when the
+/// version is unknown it falls back to a hash of [zipUrl].
 class RemoteBrickLoader extends BrickLoader {
   /// 创建远程加载器。
   ///
   /// [zipUrl] 为模板仓库的 zip 下载链接（如 GitHub release / archive 链接）。
+  /// [templateVersion] 为该模板的语义化版本号（来自 registry），用于生成可读的
+  /// 缓存键 `template_<版本号>`；为 `null` 时退化为 [zipUrl] 哈希缓存。
   /// [mirrorFallback] 为可选的镜像前缀：当原始 [zipUrl] 请求超时时，会尝试
   /// 用 `$mirrorFallback$zipUrl` 重新下载（例如 `https://ghfast.top/`）。
+  /// [logger] 用于输出镜像降级提示与下载进度；测试时可注入。
   ///
   /// Creates a remote loader. [zipUrl] is the zip download URL of the
   /// template repository (e.g. a GitHub release or archive link).
   RemoteBrickLoader({
     required this.zipUrl,
+    this.templateVersion,
     this.mirrorFallback,
+    this.logger,
     Directory? cacheDir,
   }) : cacheDir =
             cacheDir ?? Directory(p.join(Directory.systemTemp.path, 'fluzer_cache')),
-        cacheKey = 'fluzer_${zipUrl.hashCode.abs()}';
+        cacheKey = (templateVersion != null && templateVersion.isNotEmpty)
+            ? 'template_$templateVersion'
+            : 'fluzer_${zipUrl.hashCode.abs()}',
+        dio = Dio(
+          BaseOptions(
+            connectTimeout: const Duration(seconds: 5),
+            receiveTimeout: const Duration(seconds: 60),
+          ),
+        );
 
   /// 模板 zip 下载链接。
   ///
   /// Template zip download URL.
   final String zipUrl;
 
+  /// 模板的语义化版本号（用于生成可读缓存键），未知时为 `null`。
+  ///
+  /// Semantic version of the template (for a readable cache key), or `null`.
+  final String? templateVersion;
+
   /// 可选的镜像降级前缀（用于原始地址超时的情况）。
   ///
   /// Optional mirror prefix used when the original [zipUrl] times out.
   final String? mirrorFallback;
+
+  /// 日志输出器（用于镜像降级提示与下载进度）。
+  ///
+  /// Logger for mirror fallback hints and download progress.
+  final Logger? logger;
 
   /// 缓存根目录。
   ///
   /// Cache root directory.
   final Directory cacheDir;
 
-  /// 基于 [zipUrl] 的缓存键（避免不同版本相互覆盖）。
+  /// 缓存键：优先 `template_<版本号>`，未知版本时退化为 [zipUrl] 哈希。
   ///
-  /// Cache key derived from [zipUrl].
+  /// Cache key: prefers `template_<version>`, falls back to a [zipUrl] hash.
   final String cacheKey;
+
+  /// 复用的 Dio 实例，用于 zip 下载（自带进度回调与超时控制）。
+  ///
+  /// Reused Dio instance for zip download (progress + timeout control).
+  final Dio dio;
 
   @override
   Future<Brick> load(String brickName) async {
@@ -120,39 +149,94 @@ class RemoteBrickLoader extends BrickLoader {
   /// directory inside it.
   Future<Directory> _resolveBricksRoot() async {
     final extractDir = Directory(p.join(cacheDir.path, cacheKey));
-    if (extractDir.existsSync()) return _findBricksDir(extractDir);
+    if (extractDir.existsSync()) {
+      final cacheBricksDir = _findBricksDir(extractDir);
+      logger?.info('使用缓存模板: ${cacheBricksDir.path}');
+      return cacheBricksDir;
+    }
 
-    final response = await _getWithMirrorFallback(zipUrl);
+    final zipFile = await _downloadWithProgress(zipUrl);
+    try {
+      final bytes = await zipFile.readAsBytes();
+      final archive = ZipDecoder().decodeBytes(bytes);
+      for (final file in archive) {
+        final filePath = p.join(extractDir.path, file.name);
+        if (file.isFile) {
+          final outFile = File(filePath);
+          await outFile.parent.create(recursive: true);
+          await outFile.writeAsBytes(file.content as List<int>);
+        }
+      }
+    } finally {
+      // 解压完成（无论成败）后清理临时 zip，避免 systemTemp 堆积。
+      await zipFile.parent.delete(recursive: true);
+    }
+    final bricksDir = _findBricksDir(extractDir);
+    logger?.info('模板已缓存到：${bricksDir.path}');
+    return bricksDir;
+  }
+
+  /// 下载 [url] 的 zip 到临时文件，支持镜像降级与下载进度显示。
+  ///
+  /// 直连失败（[DioException]，涵盖超时 / DNS / 连接错误）时，会尝试
+  /// [mirrorFallback] 镜像地址（CN 网络下后者更常见）。
+  ///
+  /// Returns the downloaded temp file.
+  Future<File> _downloadWithProgress(String url) async {
+    try {
+      return await _downloadWithProgressFor(url, const Duration(seconds: 60));
+    } on DioException catch (e) {
+      return _tryMirror(url, e);
+    }
+  }
+
+  /// 用 [mirrorFallback] 前缀重试下载；无镜像配置或镜像也失败时，抛出原始错误。
+  Future<File> _tryMirror(String url, Object error) async {
+    final mirror = mirrorFallback;
+    if (mirror == null || mirror.isEmpty) throw error;
+    final mirrorUrl = '$mirror$url';
+    logger?.warn('原始地址请求失败，尝试镜像下载：$mirrorUrl');
+    try {
+      return _downloadWithProgressFor(mirrorUrl, const Duration(seconds: 120));
+    } on Object {
+      throw error;
+    }
+  }
+
+  /// 实际下载逻辑：用 dio 直接落盘到临时文件，并显示进度条。
+  ///
+  /// [receiveTimeout] 镜像场景可放宽（代理更慢）；[validateStatus] 设为全放行，
+  /// 由返回值手动校验 HTTP 状态。
+  Future<File> _downloadWithProgressFor(String url, Duration receiveTimeout) async {
+    final tempDir = await Directory.systemTemp.createTemp('fluzer_zip_');
+    final savePath = p.join(tempDir.path, 'template.zip');
+    final hasTerminal = stdout.hasTerminal;
+
+    final response = await dio.download(
+      url,
+      savePath,
+      options: Options(
+        receiveTimeout: receiveTimeout,
+        validateStatus: (_) => true,
+      ),
+      onReceiveProgress: (received, total) {
+        if (hasTerminal && total > 0) {
+          final percent = (received / total * 100).floor();
+          final filled = (percent / 100 * 40).floor();
+          final bar = '${'=' * filled}>${' ' * (40 - filled - 1)}';
+          stdout.write('\r下载模板: [$bar] $percent%');
+        }
+      },
+    );
+
     if (response.statusCode != 200) {
       throw CliException(
         '模板下载失败（HTTP ${response.statusCode}）：\n'
-        'Failed to download templates: $zipUrl',
+        'Failed to download templates: $url',
       );
     }
-
-    final archive = ZipDecoder().decodeBytes(response.bodyBytes);
-    for (final file in archive) {
-      final filePath = p.join(extractDir.path, file.name);
-      if (file.isFile) {
-        final outFile = File(filePath);
-        await outFile.parent.create(recursive: true);
-        await outFile.writeAsBytes(file.content as List<int>);
-      }
-    }
-    return _findBricksDir(extractDir);
-  }
-
-  /// 请求 [url]，当 [TimeoutException] 且存在 [mirrorFallback] 时，用镜像前缀重试。
-  Future<http.Response> _getWithMirrorFallback(String url) async {
-    try {
-      return await http.get(Uri.parse(url)).timeout(const Duration(seconds: 30));
-    } on TimeoutException {
-      final mirror = mirrorFallback;
-      if (mirror == null || mirror.isEmpty) rethrow;
-      return await http
-          .get(Uri.parse('$mirror$url'))
-          .timeout(const Duration(seconds: 30));
-    }
+    if (hasTerminal) stdout.writeln(); // 换行
+    return File(savePath);
   }
 
   /// 在解压树中定位 `bricks` 目录（兼容 zip 顶层多一层仓库目录的情况）。
