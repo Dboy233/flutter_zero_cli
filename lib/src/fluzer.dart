@@ -6,6 +6,7 @@
 import 'package:args/command_runner.dart';
 import 'package:mason_logger/mason_logger.dart';
 
+import 'commands/cache_command.dart';
 import 'commands/create_command.dart';
 import 'commands/new_command.dart';
 import 'commands/version_command.dart';
@@ -33,13 +34,16 @@ class Fluzer {
           )
           ..addCommand(CreateCommand(logger: logger))
           ..addCommand(NewCommand(logger: logger))
-          ..addCommand(VersionCommand(logger: logger));
+          ..addCommand(VersionCommand(logger: logger))
+          ..addCommand(CacheCommand(logger: logger));
 
     try {
       final result = await runner.run(arguments);
       return result ?? 0;
     } on UsageException catch (e) {
       logger.err(e.message);
+      // 附带完整用法（含可用子命令列表），帮助用户自助修正。
+      logger.info(e.usage);
       return ExitCode.usage.code;
     } on Object catch (e, st) {
       // 兜底：任何未被命令自身捕获的异常（如参数解析期、命令构造期、

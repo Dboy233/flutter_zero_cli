@@ -13,6 +13,7 @@ import 'package:codemod_recipe/codemod_recipe.dart';
 import 'package:fluzer/src/codemod/code_mod.dart';
 import 'package:fluzer/src/codemod/insert_at_method_end_transform.dart';
 import 'package:fluzer/src/codemod/ordered_import_transform.dart';
+import 'package:fluzer/src/commands/cache_command.dart';
 import 'package:fluzer/src/commands/create_command.dart';
 import 'package:fluzer/src/commands/new_command.dart';
 import 'package:fluzer/src/commands/version_command.dart';
@@ -522,6 +523,65 @@ void main() {
         final code = await runnerWith(
           VersionCommand(checkForUpdateFn: () async => result),
         ).run(['version']);
+        expect(code, 0);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // cache 命令：注入临时 cacheDir，覆盖 list / clean
+    // -----------------------------------------------------------------------
+    group('CacheCommand', () {
+      late Directory cacheDir;
+
+      setUp(() {
+        cacheDir = Directory.systemTemp.createTempSync('fluzer_cache_cmd_');
+      });
+
+      tearDown(() {
+        if (cacheDir.existsSync()) cacheDir.deleteSync(recursive: true);
+      });
+
+      test('cache list 空目录 → 返回 0 / empty cache list returns 0', () async {
+        final code = await runnerWith(CacheCommand(cacheDir: cacheDir))
+            .run(['cache', 'list']);
+        expect(code, 0);
+      });
+
+      test('cache list 有版本 → 返回 0 / cache list with versions returns 0',
+          () async {
+        Directory(path.join(cacheDir.path, 'template_1.0.0')).createSync();
+        Directory(path.join(cacheDir.path, 'template_1.1.0')).createSync();
+        // 版本检查缓存文件不应被当作模板版本
+        File(path.join(cacheDir.path, 'version_check.json'))
+            .writeAsStringSync('{}');
+        final code = await runnerWith(CacheCommand(cacheDir: cacheDir))
+            .run(['cache', 'list']);
+        expect(code, 0);
+      });
+
+      test('cache clean 清空版本目录 / clean removes version dirs', () async {
+        Directory(path.join(cacheDir.path, 'template_1.0.0')).createSync();
+        File(path.join(cacheDir.path, 'version_check.json'))
+            .writeAsStringSync('{}');
+        final code = await runnerWith(CacheCommand(cacheDir: cacheDir))
+            .run(['cache', 'clean']);
+        expect(code, 0);
+        // 版本目录已删除
+        expect(
+          Directory(path.join(cacheDir.path, 'template_1.0.0')).existsSync(),
+          isFalse,
+        );
+        // 版本检查缓存文件保留
+        expect(
+          File(path.join(cacheDir.path, 'version_check.json')).existsSync(),
+          isTrue,
+        );
+      });
+
+      test('cache clean 空目录 → 返回 0 / clean empty cache returns 0',
+          () async {
+        final code = await runnerWith(CacheCommand(cacheDir: cacheDir))
+            .run(['cache', 'clean']);
         expect(code, 0);
       });
     });
