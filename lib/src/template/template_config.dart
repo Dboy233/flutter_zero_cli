@@ -13,9 +13,6 @@
 /// This CLI's own version. Keep in sync with `pubspec.yaml` when releasing.
 const String cliVersion = '1.0.0';
 
-/// 默认模板版本号
-const String defaultTemplateVersion = '1.0.0';
-
 /// 远程 registry 地址（发布前替换为真实 raw URL）。
 ///
 /// 指向 `flutter_zero_template/template_registry.json` 的 raw 链接，例如
@@ -30,12 +27,20 @@ const String templateRegistryUrl =
 /// `https://github.com/<owner>/<repo>/releases/download/v1.0.0/bricks.zip`
 /// Built-in fallback template zip URL (used when registry fetch fails).
 const String defaultTemplateZipUrl =
-    'https://github.com/Dboy233/flutter_zero_template/releases/download/$defaultTemplateVersion/bricks.zip';
+    'https://github.com/Dboy233/flutter_zero_template/releases/download/1.0.0/bricks.zip';
 
-/// 国内 GitHub 镜像降级地址（当 GitHub 原始地址请求超时时使用）。
+/// 国内 GitHub 镜像降级地址（当 GitHub 原始地址请求失败时依次尝试）。
 ///
 /// 规则：前缀 + 原始 URL，例如 `https://ghfast.top/https://github.com/...`。
 ///
 /// 链接失效时可通过 https://ghproxy.link/ 查看最新可用地址。
-/// GitHub mirror fallback prefix (used when the original URL times out).
-const String githubMirrorFallback = 'https://ghfast.top/';
+/// GitHub mirror fallback prefixes, tried in order.
+const List<String> githubMirrorFallbacks = <String>[
+  'https://ghfast.top/',
+  'https://api.gitproxy.dev/',
+];
+
+/// CLI 缓存根目录名（位于系统临时目录下）。
+///
+/// Cache root directory name under the system temp directory.
+const String cacheDirName = 'fluzer_cache';

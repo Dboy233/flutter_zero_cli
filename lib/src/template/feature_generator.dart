@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 import '../codemod/feature_registration.dart';
 import '../config/project_config.dart';
 import 'brick_renderer.dart';
@@ -40,7 +42,7 @@ class FeatureGenerator {
     _validateFeatureName(featureName);
 
     final featureDir = Directory(
-      '${config.projectRoot}/lib/features/$featureName',
+      p.join(config.projectRoot, 'lib', 'features', featureName),
     );
     if (await featureDir.exists()) {
       throw CliException(
@@ -94,7 +96,7 @@ class FeatureGenerator {
   /// derived, not precomputed.
   Future<void> _registerInInjectionBase(String featureName) async {
     final injectionBase = File(
-      '${config.projectRoot}/lib/core/di/injection_base.dart',
+      p.join(config.projectRoot, 'lib', 'core', 'di', 'injection_base.dart'),
     );
     await FeatureRegistration(featureName).applyTo(injectionBase);
   }

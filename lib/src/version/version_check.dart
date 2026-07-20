@@ -12,6 +12,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 
+import '../template/semantic_version.dart';
 import '../template/template_config.dart';
 
 /// 模块级复用的 Dio 实例（用于 pub.dev 版本查询）。
@@ -73,14 +74,27 @@ Future<VersionCheckResult> checkForUpdate({
   String packageName = cliPackageName,
 }) async {
   final cached = _readCache()[packageName] as Map<String, dynamic>?;
-  if (cached != null && !_isStale(cached['checkedAt'] as int? ?? 0)) {
-    final latest = cached['latest'] as String? ?? cliVersion;
-    return VersionCheckResult(
-      current: cliVersion,
-      latest: latest,
-      hasUpdate: _compareSemver(latest, cliVersion) > 0,
-      packageName: packageName,
-    );
+  if (cached != null) {
+    final available = cached['available'] as bool? ?? true;
+    final checkedAt = cached['checkedAt'] as int? ?? 0;
+    // 可用结果缓存 24h；不可用结果（包未发布 / 网络异常）只缓存 10 分钟，
+    // 避免每次执行都白等网络超时，同时保证恢复后较快重新探测。
+    final stale = available ? _isStale(checkedAt) : _isRecentUnavailable(checkedAt);
+    if (!stale) {
+      if (!available) {
+        return VersionCheckResult.unavailable(
+          current: cliVersion,
+          packageName: packageName,
+        );
+      }
+      final latest = cached['latest'] as String? ?? cliVersion;
+      return VersionCheckResult(
+        current: cliVersion,
+        latest: latest,
+        hasUpdate: SemanticVersion.parse(latest) > SemanticVersion.parse(cliVersion),
+        packageName: packageName,
+      );
+    }
   }
 
   try {
@@ -93,6 +107,7 @@ Future<VersionCheckResult> checkForUpdate({
       ),
     );
     if (response.statusCode != 200) {
+      _writeCache(packageName, null);
       return VersionCheckResult.unavailable(
         current: cliVersion,
         packageName: packageName,
@@ -104,7 +119,7 @@ Future<VersionCheckResult> checkForUpdate({
     return VersionCheckResult(
       current: cliVersion,
       latest: latest,
-      hasUpdate: _compareSemver(latest, cliVersion) > 0,
+      hasUpdate: SemanticVersion.parse(latest) > SemanticVersion.parse(cliVersion),
       packageName: packageName,
     );
   } on Object {
@@ -115,20 +130,8 @@ Future<VersionCheckResult> checkForUpdate({
   }
 }
 
-/// 比较 `major.minor.patch`，返回负数 / 0 / 正数。忽略 pre-release。
-int _compareSemver(String a, String b) {
-  final pa = a.split('.');
-  final pb = b.split('.');
-  for (var i = 0; i < 3; i++) {
-    final na = int.tryParse(i < pa.length ? pa[i] : '0') ?? 0;
-    final nb = int.tryParse(i < pb.length ? pb[i] : '0') ?? 0;
-    if (na != nb) return na.compareTo(nb);
-  }
-  return 0;
-}
-
 /// 缓存目录（复用 CLI 的临时缓存区）/ Cache directory.
-String get _cacheDir => '${Directory.systemTemp.path}/fluzer_cache';
+String get _cacheDir => '${Directory.systemTemp.path}/$cacheDirName';
 
 String get _cacheFile => '$_cacheDir/version_check.json';
 
@@ -142,7 +145,8 @@ Map<String, dynamic> _readCache() {
   }
 }
 
-void _writeCache(String packageName, String latest) {
+/// 写入缓存。[latest] 为 null 表示本次检查不可用（包未发布 / 网络异常）。
+void _writeCache(String packageName, String? latest) {
   try {
     final dir = Directory(_cacheDir);
     if (!dir.existsSync()) dir.createSync(recursive: true);
@@ -150,6 +154,7 @@ void _writeCache(String packageName, String latest) {
     final all = _readCache();
     all[packageName] = {
       'latest': latest,
+      'available': latest != null,
       'checkedAt': DateTime.now().millisecondsSinceEpoch,
     };
     file.writeAsStringSync(jsonEncode(all));
@@ -161,5 +166,12 @@ void _writeCache(String packageName, String latest) {
 bool _isStale(int checkedAt) {
   // 24 小时的毫秒数 / 24h in milliseconds.
   const ttlMillis = 24 * 60 * 60 * 1000;
+  return DateTime.now().millisecondsSinceEpoch - checkedAt > ttlMillis;
+}
+
+/// 不可用结果是否仍在 10 分钟缓存窗口内（返回 true 表示已过期，需重新探测）。
+bool _isRecentUnavailable(int checkedAt) {
+  // 10 分钟的毫秒数 / 10min in milliseconds.
+  const ttlMillis = 10 * 60 * 1000;
   return DateTime.now().millisecondsSinceEpoch - checkedAt > ttlMillis;
 }

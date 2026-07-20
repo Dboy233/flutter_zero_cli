@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:path/path.dart' as path;
 import 'package:yaml/yaml.dart';
 
+import '../template/semantic_version.dart';
+
 /// 项目配置加载与校验。
 ///
 /// 从当前目录向上查找 `flutter_zero_config.yaml`，
@@ -59,14 +61,16 @@ class ProjectConfig {
 
   /// 查找并加载项目配置。
   ///
+  /// [start] 为向上查找的起始目录，默认当前工作目录；测试可注入临时目录。
   /// 返回配置；失败时抛出 [CliException]。
   ///
   ///
   /// Locates and loads the project configuration.
   ///
+  /// [start] is the directory to walk up from (defaults to cwd).
   /// Returns the config or throws [CliException] on failure.
-  static Future<ProjectConfig> load() async {
-    final root = await _findProjectRoot(Directory.current);
+  static Future<ProjectConfig> load({Directory? start}) async {
+    final root = await _findProjectRoot(start ?? Directory.current);
     if (root == null) {
       throw CliException(
         '未找到 $fileName，请确保在 flutter_zero 模板项目根目录下执行命令。\n'
@@ -94,7 +98,8 @@ class ProjectConfig {
       );
     }
 
-    if (_compareVersions(version, minimumSupportedVersion) < 0) {
+    if (SemanticVersion.parse(version) <
+        SemanticVersion.parse(minimumSupportedVersion)) {
       throw CliException(
         '模板版本 $version 过低，请使用 >= $minimumSupportedVersion 的项目模板。\n'
         'Template version $version is too old. '
@@ -166,20 +171,6 @@ class ProjectConfig {
       if (parent.path == current.path) return null;
       current = parent;
     }
-  }
-
-  /// 简单版本号比较，支持 x.y.z 格式。
-  ///
-  /// Simple x.y.z version comparison.
-  static int _compareVersions(String a, String b) {
-    final aParts = a.split('.').map(int.tryParse).toList();
-    final bParts = b.split('.').map(int.tryParse).toList();
-    for (var i = 0; i < aParts.length && i < bParts.length; i++) {
-      final av = aParts[i] ?? 0;
-      final bv = bParts[i] ?? 0;
-      if (av != bv) return av.compareTo(bv);
-    }
-    return aParts.length.compareTo(bParts.length);
   }
 }
 

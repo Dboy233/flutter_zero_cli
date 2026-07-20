@@ -1,9 +1,8 @@
-import 'dart:io';
-
 import 'package:args/command_runner.dart';
 import 'package:mason_logger/mason_logger.dart';
 
 import '../config/project_config.dart';
+import '../process/process_runner.dart';
 import '../template/brick_loader.dart';
 import '../template/brick_renderer.dart';
 import '../template/feature_generator.dart';
@@ -109,19 +108,11 @@ class NewCommand extends Command<int> {
     }
   }
 
-  static Future<int> _defaultBuildRunner(String projectRoot) async {
-    final process = await Process.start(
+  static Future<int> _defaultBuildRunner(String projectRoot) {
+    return ProcessRunner.run(
       'dart',
       ['run', 'build_runner', 'build', '--delete-conflicting-outputs'],
       workingDirectory: projectRoot,
-      runInShell: true,
     );
-    await process.stdout
-        .transform(const SystemEncoding().decoder)
-        .forEach(stdout.write);
-    await process.stderr
-        .transform(const SystemEncoding().decoder)
-        .forEach(stderr.write);
-    return process.exitCode;
   }
 }
