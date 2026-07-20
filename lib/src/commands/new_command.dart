@@ -111,7 +111,7 @@ class NewCommand extends Command<int> {
   static Future<int> _defaultBuildRunner(String projectRoot) {
     return ProcessRunner.run(
       'dart',
-      ['run', 'build_runner', 'build', '--delete-conflicting-outputs'],
+      ['run', 'build_runner', 'build'],
       workingDirectory: projectRoot,
     );
   }

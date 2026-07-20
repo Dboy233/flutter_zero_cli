@@ -208,7 +208,7 @@ class CreateCommand extends Command<int> {
         _logger.info(
           '跳过 build_runner，可手动运行：\n'
           'Skipped build_runner; run it manually:\n'
-          '  dart run build_runner build --delete-conflicting-outputs',
+          '  dart run build_runner build',
         );
       }
 
@@ -337,7 +337,6 @@ class CreateCommand extends Command<int> {
       'run',
       'build_runner',
       'build',
-      '--delete-conflicting-outputs',
     ], workingDirectory: projectRoot);
   }
 }
