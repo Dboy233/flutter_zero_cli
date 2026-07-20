@@ -1,7 +1,10 @@
 name: fluzer
 description: Flutter Zero 模板项目一键创建工具 / CLI tool for scaffolding Flutter Zero projects
 version: 1.0.0
-# repository: https://github.com/my_org/my_repo
+repository: https://github.com/Dboy233/flutter_zero_cli
+homepage: https://github.com/Dboy233/flutter_zero_cli
+issue_tracker: https://github.com/Dboy233/flutter_zero_cli/issues
+documentation: https://github.com/Dboy233/flutter_zero_cli/blob/main/README.md
 
 environment:
   sdk: ^3.12.2
