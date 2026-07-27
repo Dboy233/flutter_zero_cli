@@ -1,17 +1,19 @@
 # fluzer
 
-Flutter Zero 模板项目脚手架工具（CLI）。
+> 🌐 [简体中文](README_CN.md) | English
 
-📚 完整文档（命令参考、目录结构、配置）请访问：**[Flutter Zero 文档站](https://dboy233.github.io/flutter_zero_doc/)** 的 CLI 参考章节。
+The scaffolding CLI tool for Flutter Zero template projects.
 
-## 快速开始
+📚 For full documentation (command reference, directory structure, configuration), visit: **[Flutter Zero Docs](https://dboy233.github.io/flutter_zero_doc/)** — CLI reference section.
+
+## Quick Start
 
 ```bash
 dart pub global activate fluzer
 
-# 从模板创建新项目
+# Create a new project from the template
 fluzer create my_app
 
-# 在项目中生成功能模块骨架并自动注册 DI
+# Generate a feature module skeleton with automatic DI registration
 fluzer new user
 ```
