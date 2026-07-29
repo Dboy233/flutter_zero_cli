@@ -1,5 +1,8 @@
 # fluzer
 
+[![fluzer](https://img.shields.io/pub/v/fluzer.svg?label=fluzer)](https://pub.dev/packages/fluzer)
+[![template](https://img.shields.io/github/v/release/Dboy233/flutter_zero_template.svg?label=template)](https://github.com/Dboy233/flutter_zero_template/releases)
+
 > 🌐 简体中文 | [English](README.md)
 
 Flutter Zero 模板项目脚手架工具（CLI）。
