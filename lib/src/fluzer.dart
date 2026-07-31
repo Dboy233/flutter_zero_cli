@@ -8,6 +8,7 @@ import 'package:mason_logger/mason_logger.dart';
 
 import 'commands/cache_command.dart';
 import 'commands/create_command.dart';
+import 'commands/gen_l10n_command.dart';
 import 'commands/new_command.dart';
 import 'commands/version_command.dart';
 
@@ -34,6 +35,7 @@ class Fluzer {
           )
           ..addCommand(CreateCommand(logger: logger))
           ..addCommand(NewCommand(logger: logger))
+          ..addCommand(GenL10nCommand(logger: logger))
           ..addCommand(VersionCommand(logger: logger))
           ..addCommand(CacheCommand(logger: logger));
 
