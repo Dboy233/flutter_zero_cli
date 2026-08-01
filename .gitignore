@@ -19,3 +19,9 @@ coverage/
 # Logs
 *.log
 
+
+# Local compiled binaries for testing
+bin/*.exe
+
+# Local compiled binaries for testing
+bin/*.exe
