@@ -1,3 +1,21 @@
+## 1.1.0
+
+### Added
+
+- **`fluzer gen-l10n`**: runs `flutter gen-l10n` and auto-generates a type-safe localization access layer.
+  - Parses `l10n.yaml` (`arb-dir` / `output-dir` / `output-class`, with fallback probing) and the generated `AppLocalizations` abstract class (brace-counting class-body scanner).
+  - Generates `l10n_code.dart`: the `L10nCode` value object with typed factory constructors, symmetric `toString`/`parse` serialization, `==`/`hashCode`, and immutable `Map<String, String>` parameters.
+  - Generates `l10n_code_ext.dart`: `typeS()`/`typeE()`/`typeI()`/`typeW()` toast-type markers and a `toToastEffect()` shortcut for emitting effects directly from BLoCs.
+  - Generates `l10n_toast_effect_helper.dart`: a centralized switch dispatcher covering every ARB key, deserializing parameters by declared type (`int.tryParse`, `DateTime.tryParse`, ...).
+  - Auto-wires `L10nToastEffectHelper` into `defaultToastHandle` via an AST-based patch with three-state detection (template / already-wired / customized), idempotent on repeated runs. Flags: `--skip-handle-patch`, `--force-handle-patch`.
+  - Generated sources are formatted with `dart_style` and tagged with the CLI version.
+
+### Fixed
+
+- Placeholder types declared in ARB (e.g. `"type": "int"`) no longer break generation: parameter types are preserved end-to-end instead of being hardcoded as `Object`; unparseable parameter declarations now fail loudly with `FormatException` instead of being silently dropped.
+- `L10nCode.parse` tolerates malformed input (e.g. incomplete percent-encoding) instead of throwing inside the effect chain.
+- Factory parameters named `code`/`parameters` are renamed (`codeParam`/`parametersParam`) to avoid shadowing class members; map keys remain unchanged.
+
 ## 1.0.1
 
 ### Changed
