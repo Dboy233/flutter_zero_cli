@@ -271,6 +271,7 @@ void main() {
         projectRoot: projectDir.path,
         templateName: 'flutter_zero',
         packageName: 'test_app',
+        minCliVersion: '1.0.0',
       );
       final generator = FeatureGenerator(
         config: config,
@@ -314,6 +315,7 @@ void main() {
         projectRoot: projectDir.path,
         templateName: 'flutter_zero',
         packageName: 'test_app',
+        minCliVersion: '1.0.0',
       );
       final generator = FeatureGenerator(
         config: config,

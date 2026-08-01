@@ -6,6 +6,7 @@ import '../process/process_runner.dart';
 import '../template/brick_loader.dart';
 import '../template/brick_renderer.dart';
 import '../template/feature_generator.dart';
+import '../template/template_config.dart';
 import '../template/template_source.dart';
 
 /// build_runner 执行器签名。
@@ -37,14 +38,22 @@ class NewCommand extends Command<int> {
        // ignore: prefer_initializing_formals
        _loader = loader,
        _buildRunner = buildRunner ?? _defaultBuildRunner {
-    argParser.addFlag(
-      'build-runner',
-      help:
-          '生成后是否运行 build_runner / '
-          'Whether to run build_runner after generation',
-      defaultsTo: true,
-      negatable: true,
-    );
+    argParser
+      ..addFlag(
+        'build-runner',
+        help:
+            '生成后是否运行 build_runner / '
+            'Whether to run build_runner after generation',
+        defaultsTo: true,
+        negatable: true,
+      )
+      ..addFlag(
+        'skip-version-check',
+        negatable: false,
+        help:
+            '跳过项目模板版本与 CLI 版本兼容门禁 / '
+            'Skip the project-template/CLI version compatibility gate',
+      );
   }
 
   final Logger _logger;
@@ -68,7 +77,27 @@ class NewCommand extends Command<int> {
 
     try {
       final config = await ProjectConfig.load();
-      final brickLoader = _loader ?? await resolveBrickLoader(logger: _logger);
+
+      // 版本门禁：校验当前 CLI 是否支持该项目的模板版本。
+      // 环境变量覆盖（FLUZER_BRICKS_DIR / FLUZER_TEMPLATE_ZIP_URL）只影响下载
+      // 来源，门禁始终执行；可用 --skip-version-check 绕过。
+      if (!(argResults!['skip-version-check'] as bool) &&
+          !config.isCliCompatible(cliVersion)) {
+        throw CliException(
+          '当前 CLI 版本 $cliVersion 过低，项目模板 ${config.version} '
+          '需要 CLI >= ${config.minCliVersion}。请升级 fluzer 后重试，'
+          '或确认项目配置。\n'
+          'Current CLI version $cliVersion is too low; project template '
+          '${config.version} requires CLI >= ${config.minCliVersion}. '
+          'Please upgrade fluzer or check the project config.',
+        );
+      }
+
+      final brickLoader = _loader ??
+          await resolveBrickLoader(
+            logger: _logger,
+            pinnedVersion: config.version,
+          );
       final generator = FeatureGenerator(
         config: config,
         renderer: BrickRenderer(brickLoader),

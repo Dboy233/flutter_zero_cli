@@ -11,6 +11,7 @@ import '../gen_l10n/l10n_config.dart';
 import '../gen_l10n/l10n_parser.dart';
 import '../gen_l10n/toast_handle_patcher.dart';
 import '../process/process_runner.dart';
+import '../template/template_config.dart';
 
 /// `flutter gen-l10n` 执行器签名。
 typedef FlutterGenL10nRunner = Future<int> Function(String projectRoot);
@@ -43,6 +44,13 @@ class GenL10nCommand extends Command<int> {
         help:
             'l10nCode 分支已被自定义时也强制覆盖 / '
             'Overwrite even if the l10nCode branch was customized.',
+      )
+      ..addFlag(
+        'skip-version-check',
+        negatable: false,
+        help:
+            '跳过项目模板版本与 CLI 版本兼容门禁 / '
+            'Skip the project-template/CLI version compatibility gate',
       );
   }
 
@@ -62,6 +70,23 @@ class GenL10nCommand extends Command<int> {
     try {
       // 1. 校验当前目录为合法 flutter_zero 项目
       final config = await ProjectConfig.load();
+
+      // 版本门禁：校验当前 CLI 是否支持该项目的模板版本。
+      // gen-l10n 不下载模板，仅在本地生成代码；门禁通过即继续执行。
+      // 环境变量覆盖只影响下载来源（本命令无下载），门禁始终执行；
+      // 可用 --skip-version-check 绕过。
+      if (!(argResults!['skip-version-check'] as bool) &&
+          !config.isCliCompatible(cliVersion)) {
+        throw CliException(
+          '当前 CLI 版本 $cliVersion 过低，项目模板 ${config.version} '
+          '需要 CLI >= ${config.minCliVersion}。请升级 fluzer 后重试，'
+          '或确认项目配置。\n'
+          'Current CLI version $cliVersion is too low; project template '
+          '${config.version} requires CLI >= ${config.minCliVersion}. '
+          'Please upgrade fluzer or check the project config.',
+        );
+      }
+
       final projectRoot = config.projectRoot;
 
       // 2. 解析 l10n.yaml（字段缺失回退模板默认值）

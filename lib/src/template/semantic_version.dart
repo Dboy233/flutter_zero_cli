@@ -42,4 +42,17 @@ class SemanticVersion implements Comparable<SemanticVersion> {
   /// Formats back to `major.minor.patch` (used for cache keys, logs, etc.).
   @override
   String toString() => '$major.$minor.$patch';
+
+  /// 值相等比较（按 major.minor.patch 数值）。
+  ///
+  /// Value equality by major.minor.patch.
+  @override
+  bool operator ==(Object other) =>
+      other is SemanticVersion &&
+      major == other.major &&
+      minor == other.minor &&
+      patch == other.patch;
+
+  @override
+  int get hashCode => major.hashCode ^ minor.hashCode ^ patch.hashCode;
 }

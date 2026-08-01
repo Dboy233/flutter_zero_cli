@@ -1,3 +1,15 @@
+## 1.1.1
+
+### Added
+
+- **Version compatibility gate** for `new` and `gen-l10n` commands: the CLI now validates the running CLI version against the project template's required minimum (the `minCliVersion` field in `flutter_zero_config.yaml`) before proceeding. Incompatible versions are rejected with a clear upgrade prompt. A `--skip-version-check` flag bypasses the gate for debugging only.
+- `new` command now pins the exact template version declared in the project config (`flutter_zero_config.yaml` `version`) when resolving the download source, instead of always picking the latest CLI-compatible template.
+- `ProjectConfig` gains a `minCliVersion` field and an `isCliCompatible(currentCliVersion)` helper. Legacy projects without `minCliVersion` default to `"0.0.0"` (accepted by any CLI).
+
+### Fixed
+
+- `SemanticVersion` lacked value equality (`==` / `hashCode`), causing unreliable version comparisons; value equality is now implemented.
+
 ## 1.1.0
 
 ### Added

@@ -25,6 +25,7 @@ class ProjectConfig {
     required this.projectRoot,
     required this.templateName,
     required this.packageName,
+    required this.minCliVersion,
   });
 
   /// 模板版本号。
@@ -46,6 +47,28 @@ class ProjectConfig {
   ///
   /// Flutter package name, used for package imports.
   final String packageName;
+
+  /// 该模板版本要求的最低 CLI 版本。
+  ///
+  /// Minimum CLI version required by this template version.
+  ///
+  /// 缺失时（老项目未写入该字段）默认 `"0.0.0"`，表示兼容任意 CLI 版本。
+  /// Defaults to `"0.0.0"` when missing (legacy projects), meaning any CLI
+  /// version is accepted.
+  final String minCliVersion;
+
+  /// 判断当前运行的 CLI 版本是否满足该项目模板的最低要求。
+  ///
+  /// 用于 `new` / `gen-l10n` 命令的版本门禁：
+  /// 当 [currentCliVersion] >= [minCliVersion] 时返回 `true`。
+  ///
+  /// Checks whether the running CLI version satisfies this template's
+  /// minimum requirement. Returns `true` when
+  /// [currentCliVersion] >= [minCliVersion].
+  bool isCliCompatible(String currentCliVersion) {
+    return SemanticVersion.parse(minCliVersion) <=
+        SemanticVersion.parse(currentCliVersion);
+  }
 
   /// 配置文件名。
   ///
@@ -97,6 +120,12 @@ class ProjectConfig {
         'Missing valid "version" field in $fileName.',
       );
     }
+
+    // minCliVersion 为可选字段：老项目可能未写入，默认 "0.0.0"（兼容任意 CLI）。
+    final rawMinCli = yaml['minCliVersion'];
+    final minCliVersion = rawMinCli is String && rawMinCli.isNotEmpty
+        ? rawMinCli
+        : '0.0.0';
 
     if (SemanticVersion.parse(version) <
         SemanticVersion.parse(minimumSupportedVersion)) {
@@ -155,6 +184,7 @@ class ProjectConfig {
       projectRoot: root.path,
       templateName: templateName,
       packageName: packageName,
+      minCliVersion: minCliVersion,
     );
   }
 
