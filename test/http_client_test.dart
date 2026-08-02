@@ -68,10 +68,10 @@ void main() {
         await req.response.close();
       });
       final client = FluzerHttpClient(dio: Dio());
-      final file = await client.downloadFile('http://127.0.0.1:$port/dl');
-      expect(file, isNotNull);
-      expect(await file!.readAsString(), 'zip-content');
-      await file.parent.delete(recursive: true);
+      final downloaded = await client.downloadFile('http://127.0.0.1:$port/dl');
+      expect(downloaded, isNotNull);
+      expect(await downloaded!.file.readAsString(), 'zip-content');
+      await downloaded.dispose();
     });
 
     test('非 200 → 返回 null', () async {

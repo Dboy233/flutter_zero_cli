@@ -1,154 +1,134 @@
-// 统一 HTTP 客户端：Dio 实例 + 镜像降级重试 + 超时策略。
+// 统一 HTTP 客户端：Dio 实例 + 镜像降级竞速 + 超时策略。
 //
-// Unified HTTP client: shared Dio instance, mirror fallback retries, and
+// Unified HTTP client: shared Dio instance, mirror-fallback racing, and
 // timeout policy for registry fetching and template zip downloads.
 //
-// 直连使用较短超时（快速失败）；镜像为代理、响应更慢，使用更长超时
-// （实测 ghfast.top 约 5s+）。任意直连失败（超时 / DNS / 连接错误，
-// 均为 [DioException]）都会触发镜像重试。
+// 文本与 zip 下载均通过 [RaceHttpClient] 并发竞速：候选地址列表（直连 +
+// 配置的 GitHub 镜像前缀）同时发起，第一个返回有效数据者胜出，其余立即
+// 取消。因此不再需要顺序等待直连超时再回退镜像。
 
 import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:mason_logger/mason_logger.dart';
-import 'package:path/path.dart' as p;
 
 import '../template/template_config.dart';
+import 'race_http_client.dart';
 
 /// CLI 统一 HTTP 客户端。
 ///
-/// 封装镜像降级：先直连 [directTimeout]，失败后依次尝试
-/// [template_config.dart] 中配置的镜像前缀（[mirrorTimeout]）。
-/// 全部失败返回 `null`，由调用方决定降级策略。
+/// 封装镜像降级竞速：先直连，同时尝试 [template_config.dart] 中配置的镜像
+/// 前缀。任意一个成功即采用，其余请求取消。全部失败返回 `null`，由调用方
+/// 决定降级策略。
 ///
-/// Unified HTTP client with mirror fallback: direct request first, then
-/// each configured mirror prefix. Returns `null` when all attempts fail.
+/// Unified HTTP client with mirror-fallback racing. Tries the direct URL and
+/// every configured mirror prefix concurrently; the first success wins and
+/// the rest are cancelled. Returns `null` when all attempts fail.
 class FluzerHttpClient {
   /// 创建客户端。
   ///
-  /// [logger] 用于输出镜像降级提示与下载进度；测试时可注入。
-  FluzerHttpClient({Logger? logger, Dio? dio})
-      : _dio = dio ?? Dio(),
-        // ignore: prefer_initializing_formals
-        _logger = logger;
+  /// [logger] 用于输出竞速结果提示与下载进度；测试时可注入。[dio] 为统一
+  /// Dio 实例，省略时新建并传递给内部 [RaceHttpClient]。
+  ///
+  /// Creates the client. [logger] is used for result hints and download
+  /// progress; [dio] is the shared Dio instance (a new one is created and
+  /// forwarded to the internal [RaceHttpClient] when omitted).
+  FluzerHttpClient({this._logger, Dio? dio}) : _race = RaceHttpClient(dio: dio);
 
   final Logger? _logger;
-  final Dio _dio;
+  final RaceHttpClient _race;
 
-  /// 直连超时（快速失败）。
-  static const Duration directTimeout = Duration(seconds: 5);
-
-  /// 镜像超时（代理响应更慢，给足预算）。
-  static const Duration mirrorTimeout = Duration(seconds: 15);
-
-  /// 镜像下载超时（zip 体积大，预算更宽）。
-  static const Duration mirrorDownloadTimeout = Duration(seconds: 120);
-
-  /// 下载超时（直连 zip 下载）。
-  static const Duration downloadTimeout = Duration(seconds: 60);
-
-  /// GET 文本内容（如 registry JSON），带镜像降级。
+  /// 文本 GET（registry 等）整体超时。
   ///
-  /// 成功返回响应体字符串；全部失败返回 `null`。
+  /// Overall timeout for text GET (registry, etc.).
+  static const Duration textTimeout = Duration(seconds: 30);
+
+  /// 文件下载（模板 zip）整体超时。
   ///
-  /// Fetches text content with mirror fallback. Returns `null` on failure.
+  /// Overall timeout for file download (template zip).
+  static const Duration fileTimeout = Duration(seconds: 180);
+
+  /// GET 文本内容（如 registry JSON），带镜像竞速降级。
+  ///
+  /// 成功返回响应体字符串；全部失败返回 `null`。任一候选**抛异常**（非 200
+  /// 视为软失败、不抛异常）时通过内部 [onFailure] 记录告警（被胜者取消的
+  /// 候选属预期，不记录）。
+  ///
+  /// Fetches text content with mirror racing. Returns the body on success,
+  /// or `null` if all candidates fail.
   Future<String?> getText(String url) async {
-    // 1. 直连（短超时，快速失败）。
-    final direct = await _tryGet(url, directTimeout);
-    if (direct != null) return direct;
-
-    // 2. 依次尝试镜像。
-    _logger?.warn('原始地址请求失败，尝试镜像下载。');
-    for (final prefix in githubMirrorFallbacks) {
-      final mirrorUrl = '$prefix$url';
-      final body = await _tryGet(mirrorUrl, mirrorTimeout);
-      if (body != null) {
-        _logger?.info('镜像下载成功：$mirrorUrl');
-        return body;
-      }
-      _logger?.warn('镜像请求失败，尝试下一个：$mirrorUrl');
-    }
-    _logger?.err('镜像下载也失败。');
-    return null;
-  }
-
-  /// 下载文件到临时目录（如模板 zip），带镜像降级与进度显示。
-  ///
-  /// 成功返回下载的临时文件；全部失败返回 `null`。调用方负责删除文件。
-  ///
-  /// Downloads a file to a temp location with mirror fallback and a
-  /// progress bar. Returns the temp file, or `null` on failure.
-  Future<File?> downloadFile(String url) async {
-    final direct = await _tryDownload(url, downloadTimeout);
-    if (direct != null) return direct;
-
-    _logger?.warn('原始地址请求失败，尝试镜像下载。');
-    for (final prefix in githubMirrorFallbacks) {
-      final mirrorUrl = '$prefix$url';
-      final file = await _tryDownload(mirrorUrl, mirrorDownloadTimeout);
-      if (file != null) {
-        _logger?.info('镜像下载成功：$mirrorUrl');
-        return file;
-      }
-      _logger?.warn('镜像请求失败，尝试下一个：$mirrorUrl');
-    }
-    _logger?.err('镜像下载也失败。');
-    return null;
-  }
-
-  /// 单次 GET 尝试：HTTP 200 返回 body，其余情况（含网络异常）返回 null。
-  Future<String?> _tryGet(String url, Duration timeout) async {
-    try {
-      final resp = await _dio.get<dynamic>(
-        url,
-        options: Options(
-          responseType: ResponseType.plain,
-          connectTimeout: timeout,
-          receiveTimeout: timeout,
-          validateStatus: (_) => true,
-        ),
-      );
-      if (resp.statusCode != 200) return null;
-      return resp.data as String;
-    } on Object {
+    final urls = _buildCandidateUrls(url);
+    final result = await _race.getTextFirst(
+      urls,
+      perTimeout: textTimeout,
+      overallTimeout: textTimeout,
+      onFailure: _logFailure,
+    );
+    if (result == null) {
+      _logger?.err('所有候选地址（直连 + 镜像）请求均失败。');
       return null;
     }
+    _logger?.info(
+      result.url == url ? '直连请求成功：${result.url}' : '镜像请求成功：${result.url}',
+    );
+    return result.data;
   }
 
-  /// 单次下载尝试：用 dio 直接落盘到临时文件，并显示进度条。
+  /// 下载文件到临时目录（如模板 zip），带镜像竞速降级与进度显示。
   ///
-  /// HTTP 非 200 / 网络异常时删除半成品文件并返回 null。
-  Future<File?> _tryDownload(String url, Duration receiveTimeout) async {
-    final tempDir = await Directory.systemTemp.createTemp('fluzer_dl_');
-    final savePath = p.join(tempDir.path, 'download.bin');
+  /// 成功返回 [DownloadedFile]（含落盘文件与临时目录）；全部失败返回 `null`。
+  /// 调用方解压/使用后务必调用 [DownloadedFile.dispose] 清理临时目录。
+  ///
+  /// Downloads a file to a temp location with mirror racing and a progress
+  /// bar. Returns a [DownloadedFile] on success, or `null` if all candidates
+  /// fail. The caller must call [DownloadedFile.dispose] after use.
+  Future<DownloadedFile?> downloadFile(String url) async {
+    final urls = _buildCandidateUrls(url);
     final hasTerminal = stdout.hasTerminal;
 
-    try {
-      final response = await _dio.download(
-        url,
-        savePath,
-        options: Options(
-          receiveTimeout: receiveTimeout,
-          validateStatus: (_) => true,
-        ),
-        onReceiveProgress: (received, total) {
-          if (hasTerminal && total > 0) {
-            final percent = (received / total * 100).floor();
-            final filled = (percent / 100 * 40).floor();
-            final bar = '${'=' * filled}>${' ' * (40 - filled - 1)}';
-            stdout.write('\r下载模板: [$bar] $percent%');
-          }
-        },
-      );
-      if (response.statusCode != 200) {
-        await tempDir.delete(recursive: true);
-        return null;
-      }
-      if (hasTerminal) stdout.writeln(); // 换行
-      return File(savePath);
-    } on Object {
-      await tempDir.delete(recursive: true);
+    void onProgress(String url, int received, int total) {
+      if (!hasTerminal || total <= 0) return;
+      final percent = (received / total * 100).floor();
+      final filled = (percent / 100 * 40).floor();
+      final bar = '${'=' * filled}>${' ' * (40 - filled - 1)}';
+      stdout.write('\r下载模板: [$bar] $percent%');
+    }
+
+    final result = await _race.downloadFileFirst(
+      urls,
+      perTimeout: fileTimeout,
+      overallTimeout: fileTimeout,
+      onProgress: onProgress,
+      onFailure: _logFailure,
+    );
+    if (hasTerminal) stdout.writeln();
+
+    if (result == null) {
+      _logger?.err('所有候选地址（直连 + 镜像）下载均失败。');
       return null;
     }
+    _logger?.info(
+      result.url == url ? '直连下载成功：${result.url}' : '镜像下载成功：${result.url}',
+    );
+    return result.data;
   }
+
+  /// 候选失败告警：被胜者取消（Dio cancel 异常）属预期，不记录；
+  /// 其余网络/超时异常以 warn 记录，便于网络排查。
+  ///
+  /// Logs a per-candidate failure. A cancellation triggered by a winning
+  /// candidate (Dio cancel) is expected and skipped; other errors warn.
+  void _logFailure(String url, Object error) {
+    if (error is DioException && error.type == DioExceptionType.cancel) return;
+    _logger?.warn('候选地址请求失败：$url ($error)');
+  }
+
+  /// 构建候选地址列表：直连 + 各镜像前缀拼接到原 URL。
+  ///
+  /// Builds the candidate URL list: direct URL plus each mirror prefix
+  /// prepended to the original URL.
+  List<String> _buildCandidateUrls(String url) => [
+    url,
+    ...githubMirrorFallbacks.map((prefix) => '$prefix$url'),
+  ];
 }

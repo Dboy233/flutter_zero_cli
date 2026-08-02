@@ -76,7 +76,6 @@ Future<BrickLoader> resolveBrickLoader({
   final selected = pinnedVersion == null
       ? await selectTemplateZipUrl(httpClient)
       : await selectTemplateZipUrlForVersion(pinnedVersion, httpClient);
-  logger?.info('使用远程模板地址：${selected.url}');
   return RemoteBrickLoader(
     zipUrl: selected.url,
     templateVersion: selected.version,

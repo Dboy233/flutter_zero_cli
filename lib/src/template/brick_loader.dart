@@ -47,9 +47,7 @@ class LocalBrickLoader extends BrickLoader {
   Future<Brick> load(String brickName) async {
     final dir = Directory(p.normalize(p.join(bricksRoot.path, brickName)));
     if (!dir.existsSync()) {
-      throw CliException(
-        '本地模板不存在：\nLocal template not found: ${dir.path}',
-      );
+      throw CliException('本地模板不存在：\nLocal template not found: ${dir.path}');
     }
     return Brick.path(dir.path);
   }
@@ -81,12 +79,15 @@ class RemoteBrickLoader extends BrickLoader {
     this.templateVersion,
     FluzerHttpClient? httpClient,
     Directory? cacheDir,
-  })  : httpClient = httpClient ?? FluzerHttpClient(),
-        cacheDir = cacheDir ??
-            Directory(p.join(Directory.systemTemp.path, cacheDirName)),
-        cacheKey = (templateVersion != null && templateVersion.isNotEmpty)
-            ? 'template_$templateVersion'
-            : 'fluzer_${zipUrl.hashCode.abs()}';
+    Logger? logger,
+  }) : httpClient = httpClient ?? FluzerHttpClient(),
+       cacheDir =
+           cacheDir ??
+           Directory(p.join(Directory.systemTemp.path, cacheDirName)),
+       cacheKey = (templateVersion != null && templateVersion.isNotEmpty)
+           ? 'template_$templateVersion'
+           : 'fluzer_${zipUrl.hashCode.abs()}',
+       logger = logger ?? Logger();
 
   /// 模板 zip 下载链接。
   ///
@@ -113,6 +114,9 @@ class RemoteBrickLoader extends BrickLoader {
   /// Cache key: prefers `template_<version>`, falls back to a [zipUrl] hash.
   final String cacheKey;
 
+  /// log
+  final Logger logger;
+
   @override
   Future<Brick> load(String brickName) async {
     final bricksRoot = await _resolveBricksRoot();
@@ -134,18 +138,19 @@ class RemoteBrickLoader extends BrickLoader {
     final extractDir = Directory(p.join(cacheDir.path, cacheKey));
     if (extractDir.existsSync()) {
       final cacheBricksDir = _findBricksDir(extractDir);
+      logger.info('使用缓存模板/Use caching templates:$cacheBricksDir');
       return cacheBricksDir;
     }
 
-    final zipFile = await httpClient.downloadFile(zipUrl);
-    if (zipFile == null) {
+    final downloaded = await httpClient.downloadFile(zipUrl);
+    if (downloaded == null) {
       throw CliException(
         '模板下载失败（直连与镜像均不可达）：\n'
         'Failed to download templates: $zipUrl',
       );
     }
     try {
-      final bytes = await zipFile.readAsBytes();
+      final bytes = await downloaded.file.readAsBytes();
       final archive = ZipDecoder().decodeBytes(bytes);
       for (final file in archive) {
         final filePath = p.normalize(p.join(extractDir.path, file.name));
@@ -164,7 +169,7 @@ class RemoteBrickLoader extends BrickLoader {
       }
     } finally {
       // 解压完成（无论成败）后清理临时 zip，避免 systemTemp 堆积。
-      await zipFile.parent.delete(recursive: true);
+      await downloaded.dispose();
     }
     final bricksDir = _findBricksDir(extractDir);
     return bricksDir;
