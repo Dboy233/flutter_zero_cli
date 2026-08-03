@@ -21,7 +21,8 @@ void main() {
       if (outputDir.existsSync()) await outputDir.delete(recursive: true);
     });
 
-    final brickLoader = await resolveBrickLoader(logger: Logger());
+    final brickLoader =
+        await TemplateSourceResolver(logger: Logger()).resolve();
     final renderer = BrickRenderer(brickLoader);
     await renderer.generate(
       brickName: 'project',

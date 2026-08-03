@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:fluzer/src/config/project_config.dart';
-import 'package:fluzer/src/http/http_client.dart';
 import 'package:fluzer/src/config/template_config.dart';
+import 'package:fluzer/src/http/http_client.dart';
 import 'package:fluzer/src/template/template_source.dart';
 import 'package:test/test.dart';
 
@@ -34,9 +34,11 @@ void main() {
   late HttpServer server;
   late String registryUrl;
   late FluzerHttpClient client;
+  late TemplateSourceResolver resolver;
 
   setUp(() async {
     client = FluzerHttpClient(dio: Dio());
+    resolver = TemplateSourceResolver(httpClient: client);
   });
 
   tearDown(() => server.close(force: true));
@@ -50,10 +52,7 @@ void main() {
 
     test('cliVersion 1.1.0 时选 version 最大且兼容者 (1.0.1)', () async {
       // cliVersion 为常量 '1.1.0'，两条均 <= 1.1.0，取最大 version。
-      final result = await selectTemplateZipUrl(
-        client,
-        registryUrl: registryUrl,
-      );
+      final result = await resolver.selectLatest(registryUrl: registryUrl);
       expect(result.version, '1.0.1');
       expect(result.url, 'https://x/1.0.1.zip');
     });
@@ -66,8 +65,7 @@ void main() {
         await req.response.close();
       });
       server = bad;
-      final result = await selectTemplateZipUrl(
-        client,
+      final result = await resolver.selectLatest(
         registryUrl: 'http://127.0.0.1:${bad.port}/x',
       );
       expect(result.url, defaultTemplateZipUrl);
@@ -80,10 +78,7 @@ void main() {
       ]}''');
       await server.close(force: true);
       server = r.$1;
-      final result = await selectTemplateZipUrl(
-        client,
-        registryUrl: r.$2,
-      );
+      final result = await resolver.selectLatest(registryUrl: r.$2);
       expect(result.url, defaultTemplateZipUrl);
     });
   });
@@ -96,9 +91,8 @@ void main() {
     });
 
     test('命中精确版本 → 返回其 url 与 version', () async {
-      final result = await selectTemplateZipUrlForVersion(
+      final result = await resolver.selectExact(
         '1.0.1',
-        client,
         registryUrl: registryUrl,
       );
       expect(result.url, 'https://x/1.0.1.zip');
@@ -107,11 +101,7 @@ void main() {
 
     test('版本未收录 → 抛 CliException', () async {
       expect(
-        () => selectTemplateZipUrlForVersion(
-          '9.9.9',
-          client,
-          registryUrl: registryUrl,
-        ),
+        () => resolver.selectExact('9.9.9', registryUrl: registryUrl),
         throwsA(isA<CliException>()),
       );
     });
@@ -124,11 +114,7 @@ void main() {
       await server.close(force: true);
       server = r.$1;
       expect(
-        () => selectTemplateZipUrlForVersion(
-          '1.0.0',
-          client,
-          registryUrl: r.$2,
-        ),
+        () => resolver.selectExact('1.0.0', registryUrl: r.$2),
         throwsA(isA<CliException>()),
       );
     });
@@ -142,9 +128,8 @@ void main() {
       });
       server = bad;
       expect(
-        () => selectTemplateZipUrlForVersion(
+        () => resolver.selectExact(
           '1.0.1',
-          client,
           registryUrl: 'http://127.0.0.1:${bad.port}/x',
         ),
         throwsA(isA<CliException>()),

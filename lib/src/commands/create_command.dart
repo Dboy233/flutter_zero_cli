@@ -150,7 +150,8 @@ class CreateCommand extends Command<int> {
 
       // 直接渲染到当前目录：brick 的 {{name}} 层展开后即为 targetDir，
       _step('步骤 2/7：用 Mason 渲染 project 模板 ...');
-      final brickLoader = _loader ?? await resolveBrickLoader(logger: _logger);
+      final brickLoader =
+          _loader ?? await TemplateSourceResolver(logger: _logger).resolve();
       final renderer = BrickRenderer(brickLoader);
       await renderer.generate(
         brickName: 'project',
@@ -160,38 +161,19 @@ class CreateCommand extends Command<int> {
       _logger.detail('  已生成 $targetDir');
 
       _step('步骤 3/7：执行 flutter create . ...');
-      final createExitCode = await _flutterCreate(
-        targetDir,
-        projectName: projectName,
-        org: org,
+      await _runOrThrow(
+        'flutter create',
+        () => _flutterCreate(targetDir, projectName: projectName, org: org),
       );
-      if (createExitCode != 0) {
-        throw CliException(
-          'flutter create 执行失败 (exit code: $createExitCode)\n'
-          'flutter create failed (exit code: $createExitCode)',
-        );
-      }
 
       _step('步骤 4/7：清理 flutter create 生成的多余测试文件 ...');
       _cleanTests(targetDir);
 
       _step('步骤 5/7：执行 flutter pub get ...');
-      final pubGetExitCode = await _flutterPubGet(targetDir);
-      if (pubGetExitCode != 0) {
-        throw CliException(
-          'flutter pub get 执行失败 (exit code: $pubGetExitCode)\n'
-          'flutter pub get failed (exit code: $pubGetExitCode)',
-        );
-      }
+      await _runOrThrow('flutter pub get', () => _flutterPubGet(targetDir));
 
       _step('步骤 6/7：执行 flutter gen-l10n ...');
-      final genL10nExitCode = await _flutterGenL10n(targetDir);
-      if (genL10nExitCode != 0) {
-        throw CliException(
-          'flutter gen-l10n 执行失败 (exit code: $genL10nExitCode)\n'
-          'flutter gen-l10n failed (exit code: $genL10nExitCode)',
-        );
-      }
+      await _runOrThrow('flutter gen-l10n', () => _flutterGenL10n(targetDir));
 
       _step('步骤 7/7：执行 build_runner ...');
       if (runBuildRunner) {
@@ -237,6 +219,22 @@ class CreateCommand extends Command<int> {
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
+
+  /// 执行步骤命令并在非零退出码时抛出 [CliException]。
+  ///
+  /// [step] 为步骤名（自动拼入中英文错误信息），[runner] 为返回退出码的闭包
+  /// （用闭包吞掉各 runner 签名差异，如 `flutter create` 额外带 name/org）。
+  ///
+  /// Runs a step command and throws [CliException] on a non-zero exit code.
+  Future<void> _runOrThrow(String step, Future<int> Function() runner) async {
+    final code = await runner();
+    if (code != 0) {
+      throw CliException(
+        '$step 执行失败 (exit code: $code)\n'
+        '$step failed (exit code: $code)',
+      );
+    }
+  }
 
   /// 校验项目名是否合法（小写字母开头，只含小写字母、数字和下划线）。
   ///

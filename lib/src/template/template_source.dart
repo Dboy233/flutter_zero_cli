@@ -22,164 +22,162 @@ import 'dart:io';
 import 'package:fluzer/src/util/regular_utils.dart';
 import 'package:mason_logger/mason_logger.dart';
 
-import '../http/http_client.dart';
 import '../config/project_config.dart';
-import 'brick_loader.dart';
-import '../util/semantic_version.dart';
 import '../config/template_config.dart';
+import '../http/http_client.dart';
+import '../util/semantic_version.dart';
+import 'brick_loader.dart';
 
-/// 解析当前应使用的 [BrickLoader]。
+/// 模板来源解析器。
 ///
-/// [logger] 用于在镜像降级或下载时向控制台输出提示；测试时可注入。
-/// [pinnedVersion] 非空时，在远程模式下按该**精确版本**从 registry 选取下载
-/// 源（用于 `new` 命令按项目模板版本钉死下载）；为 `null` 时按 CLI 版本选
-/// 最新兼容版本（用于 `create`）。环境变量覆盖始终优先于版本选取。
+/// 封装「解析 [BrickLoader]」与「从 registry 选取模板 zip URL」两类职责，
+/// 并将 [FluzerHttpClient] / [Logger] 改为构造注入，便于测试。
 ///
-/// 解析顺序见文件头注释。返回 [Future] 因为远程模式需异步拉取 registry。
-///
-/// Resolves the [BrickLoader] to use (async, see header for the order).
-/// When [pinnedVersion] is non-null, the remote mode selects the exact version
-/// entry from the registry (used by `new` to pin the project template version);
-/// when `null`, it picks the latest CLI-compatible version (used by `create`).
-/// Environment-variable overrides always take precedence over version selection.
-Future<BrickLoader> resolveBrickLoader({
-  Logger? logger,
-  String? pinnedVersion,
-}) async {
-  // 1. 本地开发 / 调试：显式指定本地 bricks 目录时优先使用。
-  final bricksDir = Platform.environment['FLUZER_BRICKS_DIR'];
-  if (bricksDir != null && bricksDir.isNotEmpty) {
-    logger?.warn(
-      '正在使用环境变量\'FLUZER_BRICKS_DIR\'执行的模板目录。 '
-      'The template directory that is being executed using environment variables \'FLUZER_BRICKS_DIR\'',
-    );
-    logger?.warn('FLUZER_BRICKS_DIR = $bricksDir');
-    return LocalBrickLoader(Directory(bricksDir));
-  }
+/// 文件头的解析优先级说明同样适用于 [resolve]。
+class TemplateSourceResolver {
+  /// 创建解析器。
+  ///
+  /// [httpClient] 不传时内部新建（与改造前默认行为一致）；
+  /// [logger] 不传时使用默认 [Logger]，仅用于镜像降级 / 下载提示。
+  TemplateSourceResolver({FluzerHttpClient? httpClient, Logger? logger})
+    : _httpClient = httpClient ?? FluzerHttpClient(logger: logger),
+      _logger = logger ?? Logger();
 
-  // 2. 测试 / 调试：允许通过环境变量强制指定远程 URL。
-  // url必须是发布的可以下载的github链接。
-  final overrideUrl = Platform.environment['FLUZER_TEMPLATE_ZIP_URL'];
-  if (overrideUrl != null && overrideUrl.isNotEmpty) {
-    logger?.warn(
-      '正在使用环境变量\'FLUZER_TEMPLATE_ZIP_URL\'模板下载地址。 '
-      'The environment variable \'FLUZER_TEMPLATE_ZIP_URL\' template is being used to download the address.',
-    );
-    logger?.warn('FLUZER_TEMPLATE_ZIP_URL = $overrideUrl');
+  final FluzerHttpClient _httpClient;
+  final Logger _logger;
+
+  /// 解析当前应使用的 [BrickLoader]（详见文件头优先级说明）。
+  ///
+  /// [pinnedVersion] 非空时按精确版本钉死下载源（用于 `new`），
+  /// 为 `null` 时按 CLI 版本选最新兼容版本（用于 `create`）。
+  Future<BrickLoader> resolve({String? pinnedVersion}) async {
+    // 1. 本地开发 / 调试：显式指定本地 bricks 目录时优先使用。
+    final bricksDir = Platform.environment['FLUZER_BRICKS_DIR'];
+    if (bricksDir != null && bricksDir.isNotEmpty) {
+      _logger.warn(
+        '正在使用环境变量\'FLUZER_BRICKS_DIR\'执行的模板目录。 '
+        'The template directory that is being executed using environment variables \'FLUZER_BRICKS_DIR\'',
+      );
+      _logger.warn('FLUZER_BRICKS_DIR = $bricksDir');
+      return LocalBrickLoader(Directory(bricksDir));
+    }
+
+    // 2. 测试 / 调试：允许通过环境变量强制指定远程 URL。
+    // url必须是发布的可以下载的github链接。
+    final overrideUrl = Platform.environment['FLUZER_TEMPLATE_ZIP_URL'];
+    if (overrideUrl != null && overrideUrl.isNotEmpty) {
+      _logger.warn(
+        '正在使用环境变量\'FLUZER_TEMPLATE_ZIP_URL\'模板下载地址。 '
+        'The environment variable \'FLUZER_TEMPLATE_ZIP_URL\' template is being used to download the address.',
+      );
+      _logger.warn('FLUZER_TEMPLATE_ZIP_URL = $overrideUrl');
+      return RemoteBrickLoader(
+        zipUrl: overrideUrl,
+        templateVersion: RegularUtils.extractVersion(overrideUrl),
+      );
+    }
+    // 3. 远程：从 registry 选取模板 zip URL（失败回退内置默认值）。
+    final selected = pinnedVersion == null
+        ? await selectLatest()
+        : await selectExact(pinnedVersion);
     return RemoteBrickLoader(
-      zipUrl: overrideUrl,
-      templateVersion: RegularUtils.extractVersion(overrideUrl),
+      zipUrl: selected.url,
+      templateVersion: selected.version,
+      httpClient: _httpClient,
     );
   }
-  // 3. 远程：从 registry 选取模板 zip URL（失败回退内置默认值）。
-  final httpClient = FluzerHttpClient(logger: logger);
-  final selected = pinnedVersion == null
-      ? await selectTemplateZipUrl(httpClient)
-      : await selectTemplateZipUrlForVersion(pinnedVersion, httpClient);
-  return RemoteBrickLoader(
-    zipUrl: selected.url,
-    templateVersion: selected.version,
-    httpClient: httpClient,
-  );
-}
 
-/// 从 registry 选出版本兼容的模板 zip URL 及其版本号。
-///
-/// 遍历 `templates`，在所有 `minCliVersion <= [cliVersion]` 的记录中，
-/// 选取 `version` 最大者的 `url` 与 `version`；无匹配或拉取失败时回退
-/// [defaultTemplateZipUrl]，此时 `version` 为 `null`（缓存键退化为 URL 哈希）。
-///
-/// Selects the version-compatible template zip URL (and its version) from the
-/// registry. Falls back to [defaultTemplateZipUrl] with a `null` version.
-Future<({String url, String? version})> selectTemplateZipUrl(
-  FluzerHttpClient httpClient, {
-  String registryUrl = templateRegistryUrl,
-}) async {
-  try {
-    final body = await httpClient.getText(registryUrl);
-    if (body == null) {
-      return (
-        url: defaultTemplateZipUrl,
-        version: RegularUtils.extractVersion(defaultTemplateZipUrl),
-      );
-    }
-
-    final json = jsonDecode(body) as Map<String, dynamic>;
-    final templates = (json['templates'] as List?) ?? <dynamic>[];
-    String? bestUrl;
-    SemanticVersion? bestVersion;
-    for (final item in templates) {
-      final t = item as Map<String, dynamic>;
-      final minCli = SemanticVersion.parse(
-        t['minCliVersion'] as String? ?? '0.0.0',
-      );
-      if (minCli > SemanticVersion.parse(cliVersion)) continue;
-      final version = SemanticVersion.parse(t['version'] as String? ?? '0.0.0');
-      if (bestVersion == null || version > bestVersion) {
-        bestVersion = version;
-        bestUrl = t['url'] as String?;
+  /// 从 registry 选出版本兼容的模板 zip URL 及其版本号。
+  ///
+  /// 遍历 `templates`，在所有 `minCliVersion <= [cliVersion]` 的记录中，
+  /// 选取 `version` 最大者的 `url` 与 `version`；无匹配或拉取失败时回退
+  /// [defaultTemplateZipUrl]，此时 `version` 为 `null`（缓存键退化为 URL 哈希）。
+  Future<({String url, String? version})> selectLatest({
+    String registryUrl = templateRegistryUrl,
+  }) async {
+    try {
+      final body = await _httpClient.getText(registryUrl);
+      if (body == null) {
+        return (
+          url: defaultTemplateZipUrl,
+          version: RegularUtils.extractVersion(defaultTemplateZipUrl),
+        );
       }
-    }
-    if (bestUrl == null || bestVersion == null) {
+
+      final json = jsonDecode(body) as Map<String, dynamic>;
+      final templates = (json['templates'] as List?) ?? <dynamic>[];
+      String? bestUrl;
+      SemanticVersion? bestVersion;
+      for (final item in templates) {
+        final t = item as Map<String, dynamic>;
+        final minCli = SemanticVersion.parse(
+          t['minCliVersion'] as String? ?? '0.0.0',
+        );
+        if (minCli > SemanticVersion.parse(cliVersion)) continue;
+        final version = SemanticVersion.parse(
+          t['version'] as String? ?? '0.0.0',
+        );
+        if (bestVersion == null || version > bestVersion) {
+          bestVersion = version;
+          bestUrl = t['url'] as String?;
+        }
+      }
+      if (bestUrl == null || bestVersion == null) {
+        return (url: defaultTemplateZipUrl, version: null);
+      }
+      return (url: bestUrl, version: bestVersion.toString());
+    } on Object {
       return (url: defaultTemplateZipUrl, version: null);
     }
-    return (url: bestUrl, version: bestVersion.toString());
-  } on Object {
-    return (url: defaultTemplateZipUrl, version: null);
   }
-}
 
-/// 从 registry 选取指定精确 [version] 的模板 zip URL 及其版本号。
-///
-/// 用于 `new` 命令按项目模板版本钉死下载源。找不到该版本条目或拉取失败时
-/// 抛出 [CliException]，提示用户升级 CLI 或检查 registry。
-///
-/// Selects the template zip URL for the exact [version] from the registry.
-/// Throws [CliException] when the version entry is missing or the registry
-/// cannot be fetched.
-Future<({String url, String? version})> selectTemplateZipUrlForVersion(
-  String version,
-  FluzerHttpClient httpClient, {
-  String registryUrl = templateRegistryUrl,
-}) async {
-  try {
-    final body = await httpClient.getText(registryUrl);
-    if (body == null) {
+  /// 从 registry 选取指定精确 [version] 的模板 zip URL 及其版本号。
+  ///
+  /// 用于 `new` 命令按项目模板版本钉死下载源。找不到该版本条目或拉取失败时
+  /// 抛出 [CliException]，提示用户升级 CLI 或检查 registry。
+  Future<({String url, String? version})> selectExact(
+    String version, {
+    String registryUrl = templateRegistryUrl,
+  }) async {
+    try {
+      final body = await _httpClient.getText(registryUrl);
+      if (body == null) {
+        throw CliException(
+          '无法拉取模板 registry，无法定位模板版本 $version 的下载源。\n'
+          'Could not fetch the template registry to locate download source '
+          'for template version $version.',
+        );
+      }
+
+      final json = jsonDecode(body) as Map<String, dynamic>;
+      final templates = (json['templates'] as List?) ?? <dynamic>[];
+      for (final item in templates) {
+        final t = item as Map<String, dynamic>;
+        final entryVersion = t['version'] as String?;
+        if (entryVersion == version) {
+          final url = t['url'] as String?;
+          if (url == null || url.isEmpty) {
+            throw CliException(
+              '模板版本 $version 在 registry 中缺少有效的 url 字段。\n'
+              'Template version $version has no valid "url" in the registry.',
+            );
+          }
+          return (url: url, version: entryVersion);
+        }
+      }
       throw CliException(
-        '无法拉取模板 registry，无法定位模板版本 $version 的下载源。\n'
-        'Could not fetch the template registry to locate download source '
-        'for template version $version.',
+        '当前模板 registry 未收录版本 $version，请确认该模板版本已发布，'
+        '或升级 fluzer 到支持该模板的版本。\n'
+        'Template version $version was not found in the registry. '
+        'Confirm it is published or upgrade fluzer.',
+      );
+    } on CliException {
+      rethrow;
+    } on Object catch (e) {
+      throw CliException(
+        '定位模板版本 $version 的下载源失败：$e\n'
+        'Failed to locate download source for template version $version: $e',
       );
     }
-
-    final json = jsonDecode(body) as Map<String, dynamic>;
-    final templates = (json['templates'] as List?) ?? <dynamic>[];
-    for (final item in templates) {
-      final t = item as Map<String, dynamic>;
-      final entryVersion = t['version'] as String?;
-      if (entryVersion == version) {
-        final url = t['url'] as String?;
-        if (url == null || url.isEmpty) {
-          throw CliException(
-            '模板版本 $version 在 registry 中缺少有效的 url 字段。\n'
-            'Template version $version has no valid "url" in the registry.',
-          );
-        }
-        return (url: url, version: entryVersion);
-      }
-    }
-    throw CliException(
-      '当前模板 registry 未收录版本 $version，请确认该模板版本已发布，'
-      '或升级 fluzer 到支持该模板的版本。\n'
-      'Template version $version was not found in the registry. '
-      'Confirm it is published or upgrade fluzer.',
-    );
-  } on CliException {
-    rethrow;
-  } on Object catch (e) {
-    throw CliException(
-      '定位模板版本 $version 的下载源失败：$e\n'
-      'Failed to locate download source for template version $version: $e',
-    );
   }
 }

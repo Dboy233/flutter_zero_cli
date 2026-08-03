@@ -2,11 +2,11 @@ import 'package:args/command_runner.dart';
 import 'package:mason_logger/mason_logger.dart';
 
 import '../config/project_config.dart';
+import '../config/template_config.dart';
 import '../process/process_runner.dart';
 import '../template/brick_loader.dart';
 import '../template/brick_renderer.dart';
 import '../template/feature_generator.dart';
-import '../config/template_config.dart';
 import '../template/template_source.dart';
 
 /// build_runner 执行器签名。
@@ -34,7 +34,7 @@ class NewCommand extends Command<int> {
     Logger? logger,
     BrickLoader? loader,
     BuildRunnerRunner? buildRunner,
-  }) :        _logger = logger ?? Logger(),
+  }) : _logger = logger ?? Logger(),
        // ignore: prefer_initializing_formals
        _loader = loader,
        _buildRunner = buildRunner ?? _defaultBuildRunner {
@@ -93,11 +93,11 @@ class NewCommand extends Command<int> {
         );
       }
 
-      final brickLoader = _loader ??
-          await resolveBrickLoader(
+      final brickLoader =
+          _loader ??
+          await TemplateSourceResolver(
             logger: _logger,
-            pinnedVersion: config.version,
-          );
+          ).resolve(pinnedVersion: config.version);
       final generator = FeatureGenerator(
         config: config,
         renderer: BrickRenderer(brickLoader),
@@ -138,10 +138,10 @@ class NewCommand extends Command<int> {
   }
 
   static Future<int> _defaultBuildRunner(String projectRoot) {
-    return ProcessRunner.run(
-      'dart',
-      ['run', 'build_runner', 'build'],
-      workingDirectory: projectRoot,
-    );
+    return ProcessRunner.run('dart', [
+      'run',
+      'build_runner',
+      'build',
+    ], workingDirectory: projectRoot);
   }
 }
