@@ -105,7 +105,7 @@ String generateL10nCode(List<L10nMember> members) {
     ..writeln('')
     ..writeln('  /// 参数键值对（原始值，未编码）。')
     ..writeln('  final Map<String, String> parameters;')
-  // --- toString（序列化边界：统一编码）---
+    // --- toString（序列化边界：统一编码）---
     ..writeln('')
     ..writeln('  /// 将 [code] 和 [parameters] 编码为字符串。')
     ..writeln('  ///')
@@ -121,7 +121,7 @@ String generateL10nCode(List<L10nMember> members) {
     ..writeln("        .join('&');")
     ..writeln("    return '\$code?\$query';")
     ..writeln('  }')
-  // --- parse（反序列化边界：统一解码）---
+    // --- parse（反序列化边界：统一解码）---
     ..writeln('')
     ..writeln('  /// 从编码字符串反序列化 [L10nCode]。')
     ..writeln('  ///')
@@ -145,7 +145,7 @@ String generateL10nCode(List<L10nMember> members) {
     ..writeln('      return L10nCode(code: value, parameters: const {});')
     ..writeln('    }')
     ..writeln('  }')
-  // --- 相等性（值对象语义）---
+    // --- 相等性（值对象语义）---
     ..writeln('')
     ..writeln('  @override')
     ..writeln('  bool operator ==(Object other) =>')
@@ -159,11 +159,11 @@ String generateL10nCode(List<L10nMember> members) {
     ..writeln('        code,')
     ..writeln('        Object.hashAll(')
     ..writeln(
-    '          parameters.entries.map((e) => Object.hash(e.key, e.value)),',
-  )
+      '          parameters.entries.map((e) => Object.hash(e.key, e.value)),',
+    )
     ..writeln('        ),')
     ..writeln('      );')
-  // --- 元数据 key ---
+    // --- 元数据 key ---
     ..writeln('')
     ..writeln('  /// Toast 类型标记的 parameter key。')
     ..writeln(
@@ -253,7 +253,9 @@ String generateL10nToastEffectHelper(
     ..writeln(
       "import 'package:$packageName/core/localization/context_l10n.dart';",
     )
-    ..writeln("import 'package:$packageName/core/notifiers/toast_service.dart';")
+    ..writeln(
+      "import 'package:$packageName/core/notifiers/toast_service.dart';",
+    )
     ..writeln("import 'package:$packageName/core/utils/log.dart';")
     ..writeln("import 'l10n_code.dart';")
     ..writeln("import 'l10n_code_ext.dart';")
@@ -302,9 +304,7 @@ String generateL10nToastEffectHelper(
 
   buf
     ..writeln('      default:')
-    ..writeln(
-      "        Log.w('L10nToastEffectHelper: 未匹配的 l10nCode: \$code');",
-    )
+    ..writeln("        Log.w('L10nToastEffectHelper: 未匹配的 l10nCode: \$code');")
     ..writeln('        return false;')
     ..writeln('    }')
     ..writeln('  }')
@@ -336,12 +336,11 @@ String generateL10nToastEffectHelper(
 // ---------------------------------------------------------------------------
 
 /// 参数值存入 `parameters` 时的序列化表达式（原始字符串值，不编码）。
-String _serializeExpr(L10nParam p) {
-  final name = _safeParamName(p.name);
-  return p.type == 'DateTime'
-      ? '$name.toIso8601String()'
-      : '$name.toString()';
-}
+///
+/// 委托给 [L10nParam.paramType]：如 [DateTime] 使用 `toIso8601String`，
+/// 其余类型使用 `toString`。
+String _serializeExpr(L10nParam p) =>
+    p.paramType.serializeExpr(_safeParamName(p.name));
 
 /// factory 形参名：与类成员冲突的名字加 `Param` 后缀。
 ///
@@ -350,33 +349,20 @@ String _safeParamName(String name) =>
     (name == 'code' || name == 'parameters') ? '${name}Param' : name;
 
 /// helper 中从 `parameters` 还原参数时的反序列化表达式（按声明类型）。
-String _deserializeExpr(L10nParam p) {
-  final raw = "l10nCode.parameters['${p.name}']";
-  return switch (p.type) {
-    'int' => "int.tryParse($raw ?? '') ?? 0",
-    'double' => "double.tryParse($raw ?? '') ?? 0.0",
-    'num' => "num.tryParse($raw ?? '') ?? 0",
-    'bool' => "$raw == 'true'",
-    'DateTime' =>
-      "DateTime.tryParse($raw ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0)",
-    // String / Object 及其他类型直接使用字符串值
-    _ => "$raw ?? ''",
-  };
-}
+///
+/// 委托给 [L10nParam.paramType]，由具体类型处理器产出对应的
+/// `tryParse` / 布尔判断 / 默认值表达式。
+String _deserializeExpr(L10nParam p) =>
+    p.paramType.deserializeExpr("l10nCode.parameters['${p.name}']");
 
 /// 文档示例中使用的参数示例值。
-String _exampleValue(L10nParam p) => switch (p.type) {
-      'int' => '5',
-      'double' => '1.5',
-      'num' => '5',
-      'bool' => 'true',
-      'String' => "'flutter'",
-      'DateTime' => 'DateTime.now()',
-      _ => 'value',
-    };
+///
+/// 委托给 [L10nParam.paramType]，未知类型回退为 `value`。
+String _exampleValue(L10nParam p) => p.paramType.exampleValue();
 
 /// 生成文件头部（含 CLI 版本号，便于追溯）。
-String _header() => '''
+String _header() =>
+    '''
 // GENERATED CODE - DO NOT MODIFY BY HAND
 //
 // 由 fluzer v$cliVersion gen-l10n 自动生成。

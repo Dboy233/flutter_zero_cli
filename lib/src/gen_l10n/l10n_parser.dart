@@ -7,6 +7,8 @@
 /// abstract member declarations from the `AppLocalizations` class body.
 library;
 
+import 'l10n_param_type.dart';
+
 /// 本地化方法参数（名称 + Dart 类型）。
 ///
 /// A method parameter of a localization member: [name] and its
@@ -18,8 +20,13 @@ class L10nParam {
   /// 参数名。
   final String name;
 
-  /// 参数声明类型。
+  /// 参数声明类型（来自源码解析的原始类型名，如 `int`、`DateTime`）。
   final String type;
+
+  /// 对应的类型处理器，封装序列化 / 反序列化 / 示例表达式。
+  ///
+  /// 未知类型回退为 [L10nParamType.unknown]（行为与 `Object` 一致）。
+  L10nParamType get paramType => L10nParamType.fromName(type);
 
   @override
   String toString() => 'L10nParam($type $name)';
