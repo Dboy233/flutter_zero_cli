@@ -13,7 +13,7 @@ import 'package:path/path.dart' as p;
 
 import '../config/project_config.dart';
 import '../http/http_client.dart';
-import 'template_config.dart';
+import '../config/template_config.dart';
 
 /// Brick 加载器抽象。
 ///

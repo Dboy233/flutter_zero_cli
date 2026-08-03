@@ -12,8 +12,8 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 
-import '../template/semantic_version.dart';
-import '../template/template_config.dart';
+import '../util/semantic_version.dart';
+import '../config/template_config.dart';
 
 /// 模块级复用的 Dio 实例（用于 pub.dev 版本查询）。
 ///

@@ -12,7 +12,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:mason_logger/mason_logger.dart';
 
-import '../template/template_config.dart';
+import '../config/template_config.dart';
 import 'race_http_client.dart';
 
 /// CLI 统一 HTTP 客户端。

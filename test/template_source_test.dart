@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:fluzer/src/config/project_config.dart';
 import 'package:fluzer/src/http/http_client.dart';
-import 'package:fluzer/src/template/template_config.dart';
+import 'package:fluzer/src/config/template_config.dart';
 import 'package:fluzer/src/template/template_source.dart';
 import 'package:test/test.dart';
 

@@ -3,7 +3,8 @@ import 'dart:io';
 import 'package:path/path.dart' as path;
 import 'package:yaml/yaml.dart';
 
-import '../template/semantic_version.dart';
+import '../util/semantic_version.dart';
+import 'template_config.dart';
 
 /// 项目配置加载与校验。
 ///
@@ -74,13 +75,6 @@ class ProjectConfig {
   ///
   /// Configuration file name.
   static const String fileName = 'flutter_zero_config.yaml';
-
-  /// 模板项目必须包含的最小版本号。
-  ///
-  /// 未来 CLI 支持多版本时可改为版本范围兼容。
-  ///
-  /// Minimum supported template version.
-  static const String minimumSupportedVersion = '1.0.0';
 
   /// 查找并加载项目配置。
   ///

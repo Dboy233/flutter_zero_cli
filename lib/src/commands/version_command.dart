@@ -5,7 +5,7 @@
 import 'package:args/command_runner.dart';
 import 'package:mason_logger/mason_logger.dart';
 
-import '../template/template_config.dart';
+import '../config/template_config.dart';
 import '../version/version_check.dart';
 
 /// 可注入的更新检查函数，便于测试。

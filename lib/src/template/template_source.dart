@@ -25,8 +25,8 @@ import 'package:mason_logger/mason_logger.dart';
 import '../http/http_client.dart';
 import '../config/project_config.dart';
 import 'brick_loader.dart';
-import 'semantic_version.dart';
-import 'template_config.dart';
+import '../util/semantic_version.dart';
+import '../config/template_config.dart';
 
 /// 解析当前应使用的 [BrickLoader]。
 ///

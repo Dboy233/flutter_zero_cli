@@ -1,4 +1,4 @@
-import 'package:fluzer/src/template/semantic_version.dart';
+import 'package:fluzer/src/util/semantic_version.dart';
 import 'package:test/test.dart';
 
 void main() {

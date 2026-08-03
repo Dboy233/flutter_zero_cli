@@ -6,7 +6,7 @@ import '../process/process_runner.dart';
 import '../template/brick_loader.dart';
 import '../template/brick_renderer.dart';
 import '../template/feature_generator.dart';
-import '../template/template_config.dart';
+import '../config/template_config.dart';
 import '../template/template_source.dart';
 
 /// build_runner 执行器签名。

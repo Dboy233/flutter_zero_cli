@@ -33,8 +33,11 @@ class SemanticVersion implements Comparable<SemanticVersion> {
   }
 
   bool operator >(SemanticVersion other) => compareTo(other) > 0;
+
   bool operator <(SemanticVersion other) => compareTo(other) < 0;
+
   bool operator >=(SemanticVersion other) => compareTo(other) >= 0;
+
   bool operator <=(SemanticVersion other) => compareTo(other) <= 0;
 
   /// 还原为 `major.minor.patch` 字符串（用于缓存键、日志等）。

@@ -11,7 +11,7 @@ import 'package:args/command_runner.dart';
 import 'package:mason_logger/mason_logger.dart';
 import 'package:path/path.dart' as p;
 
-import '../template/template_config.dart';
+import '../config/template_config.dart';
 
 /// `cache` 命令：查看 / 清空本地模板缓存。
 ///

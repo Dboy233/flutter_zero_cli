@@ -11,7 +11,7 @@ library;
 
 import 'package:dart_style/dart_style.dart';
 
-import '../template/template_config.dart';
+import '../config/template_config.dart';
 import 'l10n_parser.dart';
 
 /// 生成 `l10n_code.dart` 内容。

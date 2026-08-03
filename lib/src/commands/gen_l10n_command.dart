@@ -11,7 +11,7 @@ import '../gen_l10n/l10n_config.dart';
 import '../gen_l10n/l10n_parser.dart';
 import '../gen_l10n/toast_handle_patcher.dart';
 import '../process/process_runner.dart';
-import '../template/template_config.dart';
+import '../config/template_config.dart';
 
 /// `flutter gen-l10n` 执行器签名。
 typedef FlutterGenL10nRunner = Future<int> Function(String projectRoot);
