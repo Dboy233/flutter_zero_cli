@@ -1,3 +1,20 @@
+## 1.1.2
+
+### Added
+
+- Concurrent mirror-racing HTTP client for template downloads: the direct URL now races against configured GitHub mirror prefixes; the first successful response wins and the rest are cancelled, removing the sequential wait for direct-timeout-then-mirror fallback.
+
+### Changed
+
+- Logging overhaul: removed the `LogPolicy` abstraction — visibility is now driven solely by `Logger.level`. Every command step is wrapped in `runWithSpinner` for a live progress indicator; in `--log` mode the spinner is suppressed and child-command output is streamed live instead.
+- The download progress bar now appears only in `--log` mode (verbose); in the default mode the step spinner conveys progress, avoiding duplicate/overlapping output.
+- Internal refactors with no user-facing behavior change: `TemplateSourceResolver` is now the single public template-source API (top-level helpers removed); the `gen-l10n` parameter-type switch was replaced by an extensible `L10nParamType` registry (OCP); config/version/util packages were restructured to remove cyclic dependencies.
+
+### Fixed
+
+- Fixed a Windows CI crash where the global `Directory.current` was restored to a temporary directory already deleted by a parallel test, failing the `NewCommand` full-flow test. Commands and the CLI entry point now accept an explicit `workingDirectory` instead of mutating global cwd.
+- Improved cross-platform test stability on the Linux/macOS/Windows CI matrix: `Platform.resolvedExecutable` replaces the `'dart'` string command, `path.join` replaces hardcoded separators, and temporary-directory deletion now retries under Windows file locking.
+
 ## 1.1.1
 
 ### Added

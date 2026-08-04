@@ -1,3 +1,20 @@
+## 1.1.2
+
+### 新增
+
+- 模板下载采用并发镜像竞速 HTTP 客户端：直连 URL 与配置的 GitHub 镜像前缀并发请求，首个成功响应胜出、其余取消，消除了此前「先等直连超时再回退镜像」的串行等待。
+
+### 变更
+
+- 日志系统重构：移除 `LogPolicy` 封装，可见性完全由 `Logger.level` 驱动。每个命令步骤都用 `runWithSpinner` 包裹以提供实时进度提示；`--log` 模式下不显示 spinner，改为实时透传子命令输出。
+- 下载进度条仅在 `--log`（verbose）模式下显示；默认模式由步骤 spinner 体现进度，避免重复或重叠输出。
+- 内部重构（无用户可见行为变化）：`TemplateSourceResolver` 成为唯一公开的模板来源 API（移除顶层辅助函数）；`gen-l10n` 参数类型的 switch 替换为可扩展的 `L10nParamType` 注册表（符合开闭原则）；配置 / 版本 / 工具包结构调整以消除循环依赖。
+
+### 修复
+
+- 修复 Windows CI 崩溃：测试在 `tearDown` 中将全局 `Directory.current` 恢复到一个已被并行测试删除的临时目录，导致 `NewCommand` 完整流程测试失败。命令与 CLI 入口现在接受显式的 `workingDirectory`，不再修改全局 cwd。
+- 提升 Linux / macOS / Windows CI 矩阵上的跨平台测试稳定性：`Platform.resolvedExecutable` 替换 `'dart'` 字符串命令，`path.join` 替换硬编码路径分隔符，临时目录删除在 Windows 文件锁定时增加重试。
+
 ## 1.1.1
 
 ### 新增

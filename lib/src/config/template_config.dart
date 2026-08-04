@@ -11,7 +11,7 @@
 /// CLI 自身版本号。发布新版本时须与 `pubspec.yaml` 的 `version` 同步。
 ///
 /// This CLI's own version. Keep in sync with `pubspec.yaml` when releasing.
-const String cliVersion = '1.1.1';
+const String cliVersion = '1.1.2';
 
 /// 远程 registry 地址（发布前替换为真实 raw URL）。
 ///
