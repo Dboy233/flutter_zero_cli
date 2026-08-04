@@ -25,6 +25,8 @@ import 'package:fluzer/src/version/version_check.dart';
 import 'package:path/path.dart' as path;
 import 'package:test/test.dart';
 
+import 'test_utils.dart';
+
 /// 在 [root] 下构造一个最小可用的 feature brick。
 Future<Directory> _buildFeatureBrick(Directory root) async {
   final bricksRoot = Directory(path.join(root.path, 'bricks'));
@@ -222,7 +224,7 @@ void main() {
       testFile = File(path.join(tempDir.path, 'test.dart'));
     });
 
-    tearDown(() => tempDir.delete(recursive: true));
+    tearDown(() async => deleteTempDir(tempDir));
 
     test('addImport 一键添加 import / one-call addImport', () async {
       await testFile.writeAsString(
@@ -263,7 +265,7 @@ void main() {
       projectDir = await _buildProject(sandbox);
     });
 
-    tearDown(() => sandbox.delete(recursive: true));
+    tearDown(() async => deleteTempDir(sandbox));
 
     test('生成功能模块并注册到 DI / generates feature and registers DI', () async {
       final config = ProjectConfig(
@@ -347,9 +349,9 @@ void main() {
         Directory.current = sandbox;
       });
 
-      tearDown(() {
+      tearDown(() async {
         Directory.current = originalCwd;
-        sandbox.deleteSync(recursive: true);
+        await deleteTempDir(sandbox);
       });
 
       test('缺少项目名 → 返回 1 / missing project name returns 1', () async {
@@ -433,9 +435,9 @@ void main() {
         Directory.current = projectDir;
       });
 
-      tearDown(() {
+      tearDown(() async {
         Directory.current = originalCwd;
-        sandbox.deleteSync(recursive: true);
+        await deleteTempDir(sandbox);
       });
 
       test('缺少功能名 → 返回 1 / missing feature name returns 1', () async {
@@ -539,8 +541,8 @@ void main() {
         cacheDir = Directory.systemTemp.createTempSync('fluzer_cache_cmd_');
       });
 
-      tearDown(() {
-        if (cacheDir.existsSync()) cacheDir.deleteSync(recursive: true);
+      tearDown(() async {
+        await deleteTempDir(cacheDir);
       });
 
       test('cache list 空目录 → 返回 0 / empty cache list returns 0', () async {

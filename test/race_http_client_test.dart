@@ -5,6 +5,8 @@ import 'package:dio/dio.dart';
 import 'package:fluzer/src/http/race_http_client.dart';
 import 'package:test/test.dart';
 
+import 'test_utils.dart';
+
 /// 可注入的假文本传输：延迟 [delay] 后返回 [result]，记录是否被取消。
 ///
 /// Injectable fake text transport: returns [result] after [delay] and records
@@ -167,7 +169,7 @@ void main() {
         ..writeAsStringSync('zip-content');
     });
 
-    tearDown(() => tempDir.delete(recursive: true));
+    tearDown(() async => deleteTempDir(tempDir));
 
     test('先下载完成者胜出，其余被取消', () async {
       final winner = _FakeFileTransport(Duration.zero, const [

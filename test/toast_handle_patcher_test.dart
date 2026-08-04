@@ -1,7 +1,10 @@
 import 'dart:io';
 
 import 'package:fluzer/src/gen_l10n/toast_handle_patcher.dart';
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
+
+import 'test_utils.dart';
 
 /// 模板原版 handle（assert 兜底），结构与 flutter_zero_template 一致，
 /// 另带一个开发者可能已扩展的 _handleErrorCode switch。
@@ -84,11 +87,11 @@ void main() {
 
   setUp(() {
     tempDir = Directory.systemTemp.createTempSync('patcher_test_');
-    handleFile = File('${tempDir.path}/default_toast_effect_handle.dart');
+    handleFile = File(p.join(tempDir.path, 'default_toast_effect_handle.dart'));
   });
 
-  tearDown(() {
-    if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+  tearDown(() async {
+    await deleteTempDir(tempDir);
   });
 
   group('patchDefaultToastHandle', () {

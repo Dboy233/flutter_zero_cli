@@ -4,6 +4,8 @@ import 'package:fluzer/src/config/project_config.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import 'test_utils.dart';
+
 void main() {
   group('ProjectConfig.isCliCompatible', () {
     ProjectConfig cfg(String minCliVersion) => ProjectConfig(
@@ -38,7 +40,7 @@ void main() {
       dir = await Directory.systemTemp.createTemp('fluzer_pc_');
     });
 
-    tearDown(() => dir.delete(recursive: true));
+    tearDown(() async => deleteTempDir(dir));
 
     Future<Directory> scaffold({String? minCliVersion}) async {
       final buf = StringBuffer()

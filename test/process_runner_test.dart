@@ -46,7 +46,7 @@ void main() {
     test('showLive:true —— 实时透传子进程输出到 sink', () async {
       final content = await _capture(
         (out, err) => ProcessRunner.run(
-          'dart',
+          Platform.resolvedExecutable,
           ['--version'],
           showLive: true,
           stdoutSink: out,
@@ -59,7 +59,7 @@ void main() {
     test('showLive:false —— 子进程输出完全隐藏（不打印）', () async {
       final content = await _capture(
         (out, err) => ProcessRunner.run(
-          'dart',
+          Platform.resolvedExecutable,
           ['--version'],
           showLive: false,
           stdoutSink: out,
@@ -115,11 +115,10 @@ void main() {
     });
 
     test('非零退出码如实返回', () async {
-      final code = await ProcessRunner.run(
-        'dart',
-        ['run', 'this_package_does_not_exist_xyz'],
-        showLive: false,
-      );
+      final code = await ProcessRunner.run(Platform.resolvedExecutable, [
+        'run',
+        'this_package_does_not_exist_xyz',
+      ], showLive: false);
       expect(code, isNonZero);
     });
   });
