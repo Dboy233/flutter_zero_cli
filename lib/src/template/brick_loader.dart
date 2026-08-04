@@ -138,7 +138,7 @@ class RemoteBrickLoader extends BrickLoader {
     final extractDir = Directory(p.join(cacheDir.path, cacheKey));
     if (extractDir.existsSync()) {
       final cacheBricksDir = _findBricksDir(extractDir);
-      logger.info('使用缓存模板/Use caching templates:$cacheBricksDir');
+      logger.detail('使用缓存模板/Use caching templates:$cacheBricksDir');
       return cacheBricksDir;
     }
 

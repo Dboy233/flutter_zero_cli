@@ -68,7 +68,7 @@ class FluzerHttpClient {
       _logger?.err('所有候选地址（直连 + 镜像）请求均失败。');
       return null;
     }
-    _logger?.info(
+    _logger?.detail(
       result.url == url ? '直连请求成功：${result.url}' : '镜像请求成功：${result.url}',
     );
     return result.data;
@@ -107,7 +107,7 @@ class FluzerHttpClient {
       _logger?.err('所有候选地址（直连 + 镜像）下载均失败。');
       return null;
     }
-    _logger?.info(
+    _logger?.detail(
       result.url == url ? '直连下载成功：${result.url}' : '镜像下载成功：${result.url}',
     );
     return result.data;

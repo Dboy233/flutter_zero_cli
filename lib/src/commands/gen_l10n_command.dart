@@ -6,12 +6,13 @@ import 'package:path/path.dart' as path;
 
 import '../codemod/code_mod.dart';
 import '../config/project_config.dart';
+import '../config/template_config.dart';
 import '../gen_l10n/l10n_code_generator.dart';
 import '../gen_l10n/l10n_config.dart';
 import '../gen_l10n/l10n_parser.dart';
 import '../gen_l10n/toast_handle_patcher.dart';
+import '../logging/spinner.dart';
 import '../process/process_runner.dart';
-import '../config/template_config.dart';
 
 /// `flutter gen-l10n` 执行器签名。
 typedef FlutterGenL10nRunner = Future<int> Function(String projectRoot);
@@ -28,8 +29,8 @@ class GenL10nCommand extends Command<int> {
   /// [flutterGenL10nFn] 用于注入 flutter gen-l10n 执行器（测试用 stub）；
   /// 省略时使用默认实现。
   GenL10nCommand({Logger? logger, FlutterGenL10nRunner? flutterGenL10nFn})
-    : _logger = logger ?? Logger(),
-      _flutterGenL10n = flutterGenL10nFn ?? _defaultFlutterGenL10n {
+    : _logger = logger ?? Logger() {
+    _flutterGenL10n = flutterGenL10nFn ?? _defaultFlutterGenL10n;
     argParser
       ..addFlag(
         'skip-handle-patch',
@@ -55,7 +56,10 @@ class GenL10nCommand extends Command<int> {
   }
 
   final Logger _logger;
-  final FlutterGenL10nRunner _flutterGenL10n;
+  late final FlutterGenL10nRunner _flutterGenL10n;
+
+  /// 标记 defaultToastHandle 文件是否不存在（用于区分「文件缺失」与「锚点缺失」）。
+  bool _patchFileNotFound = false;
 
   @override
   String get name => 'gen-l10n';
@@ -67,62 +71,87 @@ class GenL10nCommand extends Command<int> {
 
   @override
   Future<int> run() async {
+    late String projectRoot;
+    late ProjectConfig config;
+    late L10nConfig l10nConfig;
+    late List<FileSystemEntity> arbFiles;
+    late File appLocalizationsFile;
+    late List<L10nMember> members;
+
     try {
-      // 1. 校验当前目录为合法 flutter_zero 项目
-      final config = await ProjectConfig.load();
-
-      // 版本门禁：校验当前 CLI 是否支持该项目的模板版本。
-      // gen-l10n 不下载模板，仅在本地生成代码；门禁通过即继续执行。
-      // 环境变量覆盖只影响下载来源（本命令无下载），门禁始终执行；
-      // 可用 --skip-version-check 绕过。
-      if (!(argResults!['skip-version-check'] as bool) &&
-          !config.isCliCompatible(cliVersion)) {
-        throw CliException(
-          '当前 CLI 版本 $cliVersion 过低，项目模板 ${config.version} '
-          '需要 CLI >= ${config.minCliVersion}。请升级 fluzer 后重试，'
-          '或确认项目配置。\n'
-          'Current CLI version $cliVersion is too low; project template '
-          '${config.version} requires CLI >= ${config.minCliVersion}. '
-          'Please upgrade fluzer or check the project config.',
-        );
-      }
-
-      final projectRoot = config.projectRoot;
+      // 每一步骤都用 runWithSpinner 给出「正在执行」的旋转反馈；
+      // --log（verbose）模式下由 logger.level 控制不显示 spinner，过程靠日志展示。
+      // work 内部只用 detail（非 verbose 下被抑制），info/success 摘要移到
+      // spinner 结束后，避免破坏 spinner 动画所在的行。
+      await runWithSpinner(
+        logger: _logger,
+        message: '步骤 1/6：校验项目与版本门禁 ...',
+        work: () async {
+          config = await ProjectConfig.load();
+          projectRoot = config.projectRoot;
+          // 版本门禁：gen-l10n 不下载模板，门禁通过即继续执行。
+          if (!(argResults!['skip-version-check'] as bool) &&
+              !config.isCliCompatible(cliVersion)) {
+            throw CliException(
+              '当前 CLI 版本 $cliVersion 过低，项目模板 ${config.version} '
+              '需要 CLI >= ${config.minCliVersion}。请升级 fluzer 后重试，'
+              '或确认项目配置。\n'
+              'Current CLI version $cliVersion is too low; project template '
+              '${config.version} requires CLI >= ${config.minCliVersion}. '
+              'Please upgrade fluzer or check the project config.',
+            );
+          }
+        },
+      );
 
       // 2. 解析 l10n.yaml（字段缺失回退模板默认值）
-      final l10nConfig = await L10nConfig.load(projectRoot);
+      await runWithSpinner(
+        logger: _logger,
+        message: '步骤 2/6：解析 l10n.yaml 与 ARB 目录 ...',
+        work: () async {
+          l10nConfig = await L10nConfig.load(projectRoot);
+          _logger.detail(
+            '  l10n.yaml: arbDir=${l10nConfig.arbDir}, '
+            'outputDir=${l10nConfig.outputDir}, '
+            'outputClass=${l10nConfig.outputClass}',
+          );
 
-      // 3. 校验 ARB 目录存在且包含 .arb 文件
-      final arbDir = Directory(
-        path.joinAll([projectRoot, ...l10nConfig.arbDir.split('/')]),
+          final arbDir = Directory(
+            path.joinAll([projectRoot, ...l10nConfig.arbDir.split('/')]),
+          );
+          if (!await arbDir.exists()) {
+            throw CliException(
+              '未找到 ${l10nConfig.arbDir} 目录，请确保项目已配置国际化。\n'
+              'Could not find ${l10nConfig.arbDir} directory. '
+              'Make sure l10n is configured in this project.',
+            );
+          }
+          arbFiles = await arbDir
+              .list()
+              .where((e) => e is File && e.path.endsWith('.arb'))
+              .toList();
+          if (arbFiles.isEmpty) {
+            throw CliException(
+              '${l10nConfig.arbDir} 目录中没有找到 .arb 文件。\n'
+              'No .arb files found in ${l10nConfig.arbDir} directory.',
+            );
+          }
+          _logger.detail(
+            '  arb 文件: ${arbFiles.map((f) => path.basename(f.path)).join(', ')}',
+          );
+        },
       );
-      if (!await arbDir.exists()) {
-        _logger.err(
-          '未找到 ${l10nConfig.arbDir} 目录，请确保项目已配置国际化。\n'
-          'Could not find ${l10nConfig.arbDir} directory. '
-          'Make sure l10n is configured in this project.',
-        );
-        return 1;
-      }
-      final arbFiles = await arbDir
-          .list()
-          .where((e) => e is File && e.path.endsWith('.arb'))
-          .toList();
-      if (arbFiles.isEmpty) {
-        _logger.err(
-          '${l10nConfig.arbDir} 目录中没有找到 .arb 文件。\n'
-          'No .arb files found in ${l10nConfig.arbDir} directory.',
-        );
-        return 1;
-      }
       _logger.info(
         '找到 ${arbFiles.length} 个 .arb 文件 / '
         'Found ${arbFiles.length} .arb file(s)',
       );
 
-      // 4. 执行 flutter gen-l10n
-      _logger.info('正在运行 flutter gen-l10n...');
-      final exitCode = await _flutterGenL10n(projectRoot);
+      // 3. 执行 flutter gen-l10n
+      final exitCode = await runWithSpinner(
+        logger: _logger,
+        message: '步骤 3/6：执行 flutter gen-l10n ...',
+        work: () => _flutterGenL10n(projectRoot),
+      );
       if (exitCode != 0) {
         _logger.err(
           'flutter gen-l10n 执行失败（退出码: $exitCode）。\n'
@@ -132,27 +161,29 @@ class GenL10nCommand extends Command<int> {
       }
       _logger.success('flutter gen-l10n 执行完成。');
 
-      // 5. 定位生成的本地化文件（配置目录优先，回退 flutter 默认目录）
-      final appLocalizationsFile = await _findGeneratedFile(
-        projectRoot,
-        l10nConfig,
+      // 4. 解析本地化成员
+      await runWithSpinner(
+        logger: _logger,
+        message: '步骤 4/6：解析本地化成员 ...',
+        work: () async {
+          final found = await _findGeneratedFile(projectRoot, l10nConfig);
+          if (found == null) {
+            throw CliException(
+              '未找到生成的 ${l10nConfig.outputLocalizationFile}，'
+              '请检查 l10n.yaml 中 output-dir 配置。\n'
+              'Generated ${l10nConfig.outputLocalizationFile} not found. '
+              'Check output-dir in l10n.yaml.',
+            );
+          }
+          appLocalizationsFile = found;
+          final source = await appLocalizationsFile.readAsString();
+          members = parseAppLocalizations(
+            source,
+            className: l10nConfig.outputClass,
+          );
+          _logger.detail('  成员: ${members.map((m) => m.name).join(', ')}');
+        },
       );
-      if (appLocalizationsFile == null) {
-        _logger.err(
-          '未找到生成的 ${l10nConfig.outputLocalizationFile}，'
-          '请检查 l10n.yaml 中 output-dir 配置。\n'
-          'Generated ${l10nConfig.outputLocalizationFile} not found. '
-          'Check output-dir in l10n.yaml.',
-        );
-        return 1;
-      }
-
-      final source = await appLocalizationsFile.readAsString();
-      final members = parseAppLocalizations(
-        source,
-        className: l10nConfig.outputClass,
-      );
-
       final noParamCount = members.where((m) => !m.hasParams).length;
       final withParamCount = members.length - noParamCount;
       _logger.info(
@@ -167,37 +198,53 @@ class GenL10nCommand extends Command<int> {
         );
       }
 
-      // 6. 内存中生成全部内容，最后统一写入（避免部分写入的不一致状态）
-      final genDir = path.joinAll([
-        projectRoot,
-        ...l10nConfig.outputDir.split('/'),
-      ]);
-      final outputs = <File, String>{
-        File(path.join(genDir, 'l10n_code.dart')): generateL10nCode(members),
-        File(path.join(genDir, 'l10n_code_ext.dart')): generateL10nCodeExt(
-          config.packageName,
-        ),
-        File(path.join(genDir, 'l10n_toast_effect_helper.dart')):
-            generateL10nToastEffectHelper(members, config.packageName),
-      };
-
-      for (final entry in outputs.entries) {
-        await entry.key.writeAsString(entry.value);
-        _logger.success('已生成 / Generated: ${entry.key.path}');
+      // 5. 生成 L10nCode 等文件
+      final generatedPaths = <String>[];
+      await runWithSpinner(
+        logger: _logger,
+        message: '步骤 5/6：生成 L10nCode 等文件 ...',
+        work: () async {
+          final genDir = path.joinAll([
+            projectRoot,
+            ...l10nConfig.outputDir.split('/'),
+          ]);
+          final outputs = <File, String>{
+            File(path.join(genDir, 'l10n_code.dart')): generateL10nCode(
+              members,
+            ),
+            File(path.join(genDir, 'l10n_code_ext.dart')): generateL10nCodeExt(
+              config.packageName,
+            ),
+            File(path.join(genDir, 'l10n_toast_effect_helper.dart')):
+                generateL10nToastEffectHelper(members, config.packageName),
+          };
+          for (final entry in outputs.entries) {
+            await entry.key.writeAsString(entry.value);
+            generatedPaths.add(entry.key.path);
+          }
+        },
+      );
+      for (final p in generatedPaths) {
+        _logger.success('已生成 / Generated: $p');
       }
 
-      // 7. 自动接线 defaultToastHandle（幂等，可用 --skip-handle-patch 跳过）
+      // 6. 自动接线 defaultToastHandle（幂等，可用 --skip-handle-patch 跳过）
       if (argResults!['skip-handle-patch'] as bool) {
         _logger.info(
           '已跳过 defaultToastHandle 接线（--skip-handle-patch）/ '
           'Skipped handle patch.',
         );
       } else {
-        await _patchDefaultToastHandle(
-          projectRoot: projectRoot,
-          packageName: config.packageName,
-          force: argResults!['force-handle-patch'] as bool,
+        final outcome = await runWithSpinner(
+          logger: _logger,
+          message: '步骤 6/6：接线 defaultToastHandle ...',
+          work: () => _patchDefaultToastHandle(
+            projectRoot: projectRoot,
+            packageName: config.packageName,
+            force: argResults!['force-handle-patch'] as bool,
+          ),
         );
+        _reportPatchResult(outcome);
       }
 
       return 0;
@@ -216,8 +263,12 @@ class GenL10nCommand extends Command<int> {
   /// 将 `default_toast_effect_handle.dart` 的 l10nCode 分支接线到
   /// `L10nToastEffectHelper`；patched 时补齐 import 并统一格式化。
   ///
-  /// 三态：模板态替换 / 已接线幂等跳过 / 自定义态保守跳过（--force 覆盖）。
-  Future<void> _patchDefaultToastHandle({
+  /// 不在此处打印状态（会破坏外层 runWithSpinner 的动画行），改为返回
+  /// [ToastHandlePatchOutcome]，由调用方在 spinner 结束后通过
+  /// [_reportPatchResult] 打印。三态：模板态替换 / 已接线幂等跳过 /
+  /// 自定义态保守跳过（--force 覆盖）。文件不存在时返回 anchorNotFound 占位
+  /// outcome（由 [_patchFileNotFound] 区分其消息）。
+  Future<ToastHandlePatchOutcome> _patchDefaultToastHandle({
     required String projectRoot,
     required String packageName,
     required bool force,
@@ -233,24 +284,30 @@ class GenL10nCommand extends Command<int> {
       ]),
     );
     if (!await handleFile.exists()) {
-      _logger.warn(
-        '未找到 default_toast_effect_handle.dart，跳过自动接线。\n'
-        '请手动将 L10nToastEffectHelper 接入 defaultToastHandle。\n'
-        'Handle file not found; wire L10nToastEffectHelper manually.',
+      _patchFileNotFound = true;
+      return const (
+        result: ToastHandlePatchResult.anchorNotFound,
+        replacedSource: null,
       );
-      return;
     }
 
     final outcome = await patchDefaultToastHandle(handleFile, force: force);
+    if (outcome.result == ToastHandlePatchResult.patched) {
+      // 补齐 import（幂等），随后 dart_style 库内统一格式化
+      final mod = CodeMod(handleFile, format: false);
+      await mod.addImport('package:$packageName/l10n/gen/l10n_code.dart');
+      await mod.addImport(
+        'package:$packageName/l10n/gen/l10n_toast_effect_helper.dart',
+      );
+      await formatDartFile(handleFile);
+    }
+    return outcome;
+  }
+
+  /// 在 spinner 结束后打印接线结果（避免在 runWithSpinner 内部打印破坏动画行）。
+  void _reportPatchResult(ToastHandlePatchOutcome outcome) {
     switch (outcome.result) {
       case ToastHandlePatchResult.patched:
-        // 补齐 import（幂等），随后 dart_style 库内统一格式化
-        final mod = CodeMod(handleFile, format: false);
-        await mod.addImport('package:$packageName/l10n/gen/l10n_code.dart');
-        await mod.addImport(
-          'package:$packageName/l10n/gen/l10n_toast_effect_helper.dart',
-        );
-        await formatDartFile(handleFile);
         _logger.success(
           'defaultToastHandle 已接线 L10nToastEffectHelper。\n'
           'Wired L10nToastEffectHelper into defaultToastHandle.\n'
@@ -267,11 +324,19 @@ class GenL10nCommand extends Command<int> {
           'Use --force-handle-patch to overwrite.',
         );
       case ToastHandlePatchResult.anchorNotFound:
-        _logger.warn(
-          '未找到 defaultToastHandle 的 l10nCode 分支锚点，跳过接线。\n'
-          '请手动接入 L10nToastEffectHelper。\n'
-          'Branch anchor not found; wire L10nToastEffectHelper manually.',
-        );
+        if (_patchFileNotFound) {
+          _logger.warn(
+            '未找到 default_toast_effect_handle.dart，跳过自动接线。\n'
+            '请手动将 L10nToastEffectHelper 接入 defaultToastHandle。\n'
+            'Handle file not found; wire L10nToastEffectHelper manually.',
+          );
+        } else {
+          _logger.warn(
+            '未找到 defaultToastHandle 的 l10nCode 分支锚点，跳过接线。\n'
+            '请手动接入 L10nToastEffectHelper。\n'
+            'Branch anchor not found; wire L10nToastEffectHelper manually.',
+          );
+        }
     }
   }
 
@@ -300,9 +365,12 @@ class GenL10nCommand extends Command<int> {
     return null;
   }
 
-  static Future<int> _defaultFlutterGenL10n(String projectRoot) {
-    return ProcessRunner.run('flutter', [
-      'gen-l10n',
-    ], workingDirectory: projectRoot);
+  Future<int> _defaultFlutterGenL10n(String projectRoot) {
+    return ProcessRunner.run(
+      'flutter',
+      ['gen-l10n'],
+      workingDirectory: projectRoot,
+      showLive: _logger.level == Level.verbose,
+    );
   }
 }

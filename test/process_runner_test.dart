@@ -1,36 +1,125 @@
 import 'dart:io';
 
 import 'package:fluzer/src/process/process_runner.dart';
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+/// 运行 [body]，将其 stdout / stderr 捕获到同一临时文件，返回文件内容。
+///
+/// 返回内容包含 [ProcessRunner] 实际写入 sink 的子进程输出（若 [showLive]
+/// 为 true），或为空（若 [showLive] 为 false，子进程输出被隐藏/丢弃）。
+Future<String> _capture(
+  Future<int> Function(IOSink out, IOSink err) body,
+) async {
+  final file = File(
+    p.join(
+      Directory.systemTemp.path,
+      'fluzer_cap_${DateTime.now().microsecondsSinceEpoch}.log',
+    ),
+  );
+  final sink = file.openWrite();
+  try {
+    await body(sink, sink);
+    await sink.flush();
+  } finally {
+    await sink.close();
+  }
+  final content = await file.readAsString();
+  await file.delete();
+  return content;
+}
+
+/// 写一个临时 dart 脚本并返回其路径（用于产生可控的多行输出）。
+Future<File> _writeScript(String source) async {
+  final file = File(
+    p.join(
+      Directory.systemTemp.path,
+      'fluzer_script_${DateTime.now().microsecondsSinceEpoch}.dart',
+    ),
+  );
+  await file.writeAsString(source);
+  return file;
+}
+
 void main() {
-  group('ProcessRunner.run', () {
-    test('成功执行返回 0', () async {
-      // 用当前 dart 可执行文件自身，必然存在且 --version 返回 0。
-      // 取 resolvedExecutable（绝对路径），避免 PATH 差异导致找不到命令。
-      final code = await ProcessRunner.run(
-        Platform.resolvedExecutable,
-        ['--version'],
+  group('ProcessRunner.run 输出策略（显示 / 隐藏）', () {
+    test('showLive:true —— 实时透传子进程输出到 sink', () async {
+      final content = await _capture(
+        (out, err) => ProcessRunner.run(
+          'dart',
+          ['--version'],
+          showLive: true,
+          stdoutSink: out,
+          stderrSink: err,
+        ),
       );
-      expect(code, 0);
+      expect(content, contains('Dart SDK version'));
     });
 
-    test('非零退出码原样返回', () async {
-      // ProcessRunner 固定 runInShell: true，实际启动的是 shell 本身：
-      // Windows → cmd.exe /c ...，POSIX → /bin/sh -c '...'。
-      // 因此退出码要用各自 shell 的语法产生，不能共用 cmd 的写法。
-      final code = Platform.isWindows
-          ? await ProcessRunner.run('cmd', ['/c', 'exit', '3'])
-          : await ProcessRunner.run('sh', ['-c', 'exit 3']);
-      expect(code, 3);
+    test('showLive:false —— 子进程输出完全隐藏（不打印）', () async {
+      final content = await _capture(
+        (out, err) => ProcessRunner.run(
+          'dart',
+          ['--version'],
+          showLive: false,
+          stdoutSink: out,
+          stderrSink: err,
+        ),
+      );
+      expect(content, isNot(contains('Dart SDK version')));
     });
 
-    test('不存在的命令返回非 0 退出码（shell 兜底，不抛异常）', () async {
-      // runInShell: true 时被 Process.start 启动的是 cmd.exe / /bin/sh，
-      // 它们一定存在，所以不会抛 ProcessException；
-      // “命令不存在”由 shell 自己转成非 0 退出码（sh 为 127、cmd 为 1/9009）。
-      const missing = 'definitely_not_a_real_cmd_zzz_12345';
-      final code = await ProcessRunner.run(missing, []);
+    test('超长折行输出 + showLive:false —— 同样完全隐藏', () async {
+      final script = await _writeScript(
+        "import 'dart:io';\n"
+        "void main() {\n"
+        "  stdout.write('${'a' * 400}\\n');\n"
+        "  stdout.write('resolving dependencies...\\n');\n"
+        "  stderr.write('${'b' * 300}\\n');\n"
+        '}',
+      );
+      final content = await _capture(
+        (out, err) => ProcessRunner.run(
+          Platform.resolvedExecutable,
+          ['run', script.path],
+          showLive: false,
+          stdoutSink: out,
+          stderrSink: err,
+        ),
+      );
+      await script.delete();
+      expect(content, isNot(contains('resolving dependencies')));
+      expect(content, isNot(contains('a' * 400)));
+    });
+
+    test('超长折行输出 + showLive:true —— 实时显示（含折行内容）', () async {
+      final script = await _writeScript(
+        "import 'dart:io';\n"
+        "void main() {\n"
+        "  stdout.write('${'a' * 400}\\n');\n"
+        "  stdout.write('resolving dependencies...\\n');\n"
+        '}',
+      );
+      final content = await _capture(
+        (out, err) => ProcessRunner.run(
+          Platform.resolvedExecutable,
+          ['run', script.path],
+          showLive: true,
+          stdoutSink: out,
+          stderrSink: err,
+        ),
+      );
+      await script.delete();
+      expect(content, contains('resolving dependencies'));
+      expect(content, contains('a' * 400));
+    });
+
+    test('非零退出码如实返回', () async {
+      final code = await ProcessRunner.run(
+        'dart',
+        ['run', 'this_package_does_not_exist_xyz'],
+        showLive: false,
+      );
       expect(code, isNonZero);
     });
   });

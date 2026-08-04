@@ -3,6 +3,7 @@ import 'package:mason_logger/mason_logger.dart';
 
 import '../config/project_config.dart';
 import '../config/template_config.dart';
+import '../logging/spinner.dart';
 import '../process/process_runner.dart';
 import '../template/brick_loader.dart';
 import '../template/brick_renderer.dart';
@@ -36,8 +37,8 @@ class NewCommand extends Command<int> {
     BuildRunnerRunner? buildRunner,
   }) : _logger = logger ?? Logger(),
        // ignore: prefer_initializing_formals
-       _loader = loader,
-       _buildRunner = buildRunner ?? _defaultBuildRunner {
+       _loader = loader {
+    _buildRunner = buildRunner ?? _defaultBuildRunner;
     argParser
       ..addFlag(
         'build-runner',
@@ -58,7 +59,7 @@ class NewCommand extends Command<int> {
 
   final Logger _logger;
   final BrickLoader? _loader;
-  final BuildRunnerRunner _buildRunner;
+  late final BuildRunnerRunner _buildRunner;
 
   @override
   String get name => 'new';
@@ -75,35 +76,62 @@ class NewCommand extends Command<int> {
       return 1;
     }
 
+    late ProjectConfig config;
+    late BrickLoader brickLoader;
+
     try {
-      final config = await ProjectConfig.load();
+      // 每一步骤都用 runWithSpinner 给出「正在执行」的旋转反馈；
+      // --log（verbose）模式下由 logger.level 控制不显示 spinner，过程靠日志展示。
+      // work 内部只用 detail（非 verbose 下被抑制），避免破坏 spinner 行。
+      await runWithSpinner(
+        logger: _logger,
+        message: '步骤 1/4：加载项目配置与版本门禁 ...',
+        work: () async {
+          config = await ProjectConfig.load();
+          _logger.detail('  项目根目录: ${config.projectRoot}');
+          _logger.detail(
+            '  项目模板版本: ${config.version}，要求 CLI >= ${config.minCliVersion}',
+          );
 
-      // 版本门禁：校验当前 CLI 是否支持该项目的模板版本。
-      // 环境变量覆盖（FLUZER_BRICKS_DIR / FLUZER_TEMPLATE_ZIP_URL）只影响下载
-      // 来源，门禁始终执行；可用 --skip-version-check 绕过。
-      if (!(argResults!['skip-version-check'] as bool) &&
-          !config.isCliCompatible(cliVersion)) {
-        throw CliException(
-          '当前 CLI 版本 $cliVersion 过低，项目模板 ${config.version} '
-          '需要 CLI >= ${config.minCliVersion}。请升级 fluzer 后重试，'
-          '或确认项目配置。\n'
-          'Current CLI version $cliVersion is too low; project template '
-          '${config.version} requires CLI >= ${config.minCliVersion}. '
-          'Please upgrade fluzer or check the project config.',
-        );
-      }
-
-      final brickLoader =
-          _loader ??
-          await TemplateSourceResolver(
-            logger: _logger,
-          ).resolve(pinnedVersion: config.version);
-      final generator = FeatureGenerator(
-        config: config,
-        renderer: BrickRenderer(brickLoader),
+          // 版本门禁：校验当前 CLI 是否支持该项目的模板版本。
+          // 环境变量覆盖只影响下载来源，门禁始终执行；可用 --skip-version-check 绕过。
+          if (!(argResults!['skip-version-check'] as bool) &&
+              !config.isCliCompatible(cliVersion)) {
+            throw CliException(
+              '当前 CLI 版本 $cliVersion 过低，项目模板 ${config.version} '
+              '需要 CLI >= ${config.minCliVersion}。请升级 fluzer 后重试，'
+              '或确认项目配置。\n'
+              'Current CLI version $cliVersion is too low; project template '
+              '${config.version} requires CLI >= ${config.minCliVersion}. '
+              'Please upgrade fluzer or check the project config.',
+            );
+          }
+        },
       );
 
-      await generator.generate(featureName);
+      await runWithSpinner(
+        logger: _logger,
+        message: '步骤 2/4：解析模板加载器（本地或远程下载）...',
+        work: () async {
+          _logger.detail('  按项目模板版本 ${config.version} 钉死下载源');
+          brickLoader = _loader ??
+              await TemplateSourceResolver(logger: _logger)
+                  .resolve(pinnedVersion: config.version);
+        },
+      );
+
+      await runWithSpinner(
+        logger: _logger,
+        message: '步骤 3/4：生成功能模块 $featureName ...',
+        work: () async {
+          final generator = FeatureGenerator(
+            config: config,
+            renderer: BrickRenderer(brickLoader),
+          );
+          await generator.generate(featureName);
+          _logger.detail('  已生成功能模块 $featureName');
+        },
+      );
 
       _logger.success(
         '功能模块 $featureName 已创建并注册到 DI。\n'
@@ -112,8 +140,11 @@ class NewCommand extends Command<int> {
 
       final runBuildRunner = argResults!['build-runner'] as bool;
       if (runBuildRunner) {
-        _logger.info('正在运行 build_runner... / Running build_runner...');
-        final exitCode = await _buildRunner(config.projectRoot);
+        final exitCode = await runWithSpinner(
+          logger: _logger,
+          message: '步骤 4/4：运行 build_runner ...',
+          work: () => _buildRunner(config.projectRoot),
+        );
         if (exitCode != 0) {
           _logger.err('build_runner 执行失败。\nbuild_runner failed.');
           return exitCode;
@@ -137,11 +168,12 @@ class NewCommand extends Command<int> {
     }
   }
 
-  static Future<int> _defaultBuildRunner(String projectRoot) {
-    return ProcessRunner.run('dart', [
-      'run',
-      'build_runner',
-      'build',
-    ], workingDirectory: projectRoot);
+  Future<int> _defaultBuildRunner(String projectRoot) {
+    return ProcessRunner.run(
+      'dart',
+      ['run', 'build_runner', 'build'],
+      workingDirectory: projectRoot,
+      showLive: _logger.level == Level.verbose,
+    );
   }
 }

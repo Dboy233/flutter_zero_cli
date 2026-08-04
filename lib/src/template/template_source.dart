@@ -54,11 +54,11 @@ class TemplateSourceResolver {
     // 1. 本地开发 / 调试：显式指定本地 bricks 目录时优先使用。
     final bricksDir = Platform.environment['FLUZER_BRICKS_DIR'];
     if (bricksDir != null && bricksDir.isNotEmpty) {
-      _logger.warn(
+      _logger.detail(
         '正在使用环境变量\'FLUZER_BRICKS_DIR\'执行的模板目录。 '
         'The template directory that is being executed using environment variables \'FLUZER_BRICKS_DIR\'',
       );
-      _logger.warn('FLUZER_BRICKS_DIR = $bricksDir');
+      _logger.detail('FLUZER_BRICKS_DIR = $bricksDir');
       return LocalBrickLoader(Directory(bricksDir));
     }
 
@@ -66,11 +66,11 @@ class TemplateSourceResolver {
     // url必须是发布的可以下载的github链接。
     final overrideUrl = Platform.environment['FLUZER_TEMPLATE_ZIP_URL'];
     if (overrideUrl != null && overrideUrl.isNotEmpty) {
-      _logger.warn(
+      _logger.detail(
         '正在使用环境变量\'FLUZER_TEMPLATE_ZIP_URL\'模板下载地址。 '
         'The environment variable \'FLUZER_TEMPLATE_ZIP_URL\' template is being used to download the address.',
       );
-      _logger.warn('FLUZER_TEMPLATE_ZIP_URL = $overrideUrl');
+      _logger.detail('FLUZER_TEMPLATE_ZIP_URL = $overrideUrl');
       return RemoteBrickLoader(
         zipUrl: overrideUrl,
         templateVersion: RegularUtils.extractVersion(overrideUrl),

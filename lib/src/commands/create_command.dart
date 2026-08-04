@@ -10,6 +10,7 @@ import 'package:mason_logger/mason_logger.dart';
 import 'package:path/path.dart' as p;
 
 import '../config/project_config.dart';
+import '../logging/spinner.dart';
 import '../process/process_runner.dart';
 import '../template/brick_loader.dart';
 import '../template/brick_renderer.dart';
@@ -75,11 +76,11 @@ class CreateCommand extends Command<int> {
     CreateBuildRunnerRunner? buildRunner,
   }) : _logger = logger ?? Logger(),
        // ignore: prefer_initializing_formals
-       _loader = loader,
-       _flutterCreate = flutterCreate ?? _defaultFlutterCreate,
-       _flutterPubGet = flutterPubGet ?? _defaultFlutterPubGet,
-       _flutterGenL10n = flutterGenL10n ?? _defaultFlutterGenL10n,
-       _buildRunner = buildRunner ?? _defaultBuildRunner {
+       _loader = loader {
+    _flutterCreate = flutterCreate ?? _defaultFlutterCreate;
+    _flutterPubGet = flutterPubGet ?? _defaultFlutterPubGet;
+    _flutterGenL10n = flutterGenL10n ?? _defaultFlutterGenL10n;
+    _buildRunner = buildRunner ?? _defaultBuildRunner;
     argParser.addOption(
       'org',
       defaultsTo: 'com.example',
@@ -95,10 +96,10 @@ class CreateCommand extends Command<int> {
 
   final Logger _logger;
   final BrickLoader? _loader;
-  final CreateFlutterCreateRunner _flutterCreate;
-  final CreateFlutterPubGetRunner _flutterPubGet;
-  final CreateFlutterGenL10nRunner _flutterGenL10n;
-  final CreateBuildRunnerRunner _buildRunner;
+  late final CreateFlutterCreateRunner _flutterCreate;
+  late final CreateFlutterPubGetRunner _flutterPubGet;
+  late final CreateFlutterGenL10nRunner _flutterGenL10n;
+  late final CreateBuildRunnerRunner _buildRunner;
 
   @override
   String get name => 'create';
@@ -136,48 +137,78 @@ class CreateCommand extends Command<int> {
     final targetDir = p.join(Directory.current.path, projectName);
 
     try {
-      _step('步骤 1/7：校验项目名 ...');
-      _logger.detail('  项目名: $projectName, 组织: $org');
-
-      // 检查目标目录是否已存在
-      if (Directory(targetDir).existsSync()) {
-        throw CliException(
-          '目录 $projectName 已存在，请选择不同的项目名。\n'
-          'Directory $projectName already exists. '
-          'Please choose a different project name.',
-        );
-      }
-
-      // 直接渲染到当前目录：brick 的 {{name}} 层展开后即为 targetDir，
-      _step('步骤 2/7：用 Mason 渲染 project 模板 ...');
-      final brickLoader =
-          _loader ?? await TemplateSourceResolver(logger: _logger).resolve();
-      final renderer = BrickRenderer(brickLoader);
-      await renderer.generate(
-        brickName: 'project',
-        outputDir: Directory.current,
-        vars: {'name': projectName},
+      // 每一步骤都用 runWithSpinner 给出「正在执行」的旋转反馈；
+      // --log（verbose）模式下由 logger.level 控制不显示 spinner，过程靠日志展示。
+      // work 内部只用 detail（非 verbose 下被抑制），避免破坏 spinner 行。
+      await runWithSpinner(
+        logger: _logger,
+        message: '步骤 1/7：校验项目名与目录 ...',
+        work: () async {
+          if (!_isValidProjectName(projectName)) {
+            throw CliException(
+              '项目名不合法：必须只包含小写字母、数字和下划线，且以字母开头。\n'
+              'Invalid project name: must contain only lowercase letters, '
+              'digits, and underscores, starting with a letter.',
+            );
+          }
+          _logger.detail('  项目名: $projectName, 组织: $org');
+          // 检查目标目录是否已存在
+          if (Directory(targetDir).existsSync()) {
+            throw CliException(
+              '目录 $projectName 已存在，请选择不同的项目名。\n'
+              'Directory $projectName already exists. '
+              'Please choose a different project name.',
+            );
+          }
+        },
       );
-      _logger.detail('  已生成 $targetDir');
 
-      _step('步骤 3/7：执行 flutter create . ...');
+      await runWithSpinner(
+        logger: _logger,
+        message: '步骤 2/7：用 Mason 渲染 project 模板 ...',
+        work: () async {
+          // 直接渲染到当前目录：brick 的 {{name}} 层展开后即为 targetDir
+          final brickLoader =
+              _loader ?? await TemplateSourceResolver(logger: _logger).resolve();
+          final renderer = BrickRenderer(brickLoader);
+          await renderer.generate(
+            brickName: 'project',
+            outputDir: Directory.current,
+            vars: {'name': projectName},
+          );
+          _logger.detail('  已生成 $targetDir');
+        },
+      );
+
       await _runOrThrow(
-        'flutter create',
+        '步骤 3/7：执行 flutter create . ...',
         () => _flutterCreate(targetDir, projectName: projectName, org: org),
       );
 
-      _step('步骤 4/7：清理 flutter create 生成的多余测试文件 ...');
-      _cleanTests(targetDir);
+      await runWithSpinner(
+        logger: _logger,
+        message: '步骤 4/7：清理 flutter create 生成的多余测试文件 ...',
+        work: () async {
+          _cleanTests(targetDir);
+        },
+      );
 
-      _step('步骤 5/7：执行 flutter pub get ...');
-      await _runOrThrow('flutter pub get', () => _flutterPubGet(targetDir));
+      await _runOrThrow(
+        '步骤 5/7：执行 flutter pub get ...',
+        () => _flutterPubGet(targetDir),
+      );
 
-      _step('步骤 6/7：执行 flutter gen-l10n ...');
-      await _runOrThrow('flutter gen-l10n', () => _flutterGenL10n(targetDir));
+      await _runOrThrow(
+        '步骤 6/7：执行 flutter gen-l10n ...',
+        () => _flutterGenL10n(targetDir),
+      );
 
-      _step('步骤 7/7：执行 build_runner ...');
       if (runBuildRunner) {
-        final brExitCode = await _buildRunner(targetDir);
+        final brExitCode = await runWithSpinner(
+          logger: _logger,
+          message: '步骤 7/7：执行 build_runner ...',
+          work: () => _buildRunner(targetDir),
+        );
         if (brExitCode != 0) {
           _logger.warn(
             'build_runner 执行失败 (exit code: $brExitCode)，'
@@ -227,7 +258,11 @@ class CreateCommand extends Command<int> {
   ///
   /// Runs a step command and throws [CliException] on a non-zero exit code.
   Future<void> _runOrThrow(String step, Future<int> Function() runner) async {
-    final code = await runner();
+    final code = await runWithSpinner(
+      logger: _logger,
+      message: step,
+      work: runner,
+    );
     if (code != 0) {
       throw CliException(
         '$step 执行失败 (exit code: $code)\n'
@@ -243,11 +278,6 @@ class CreateCommand extends Command<int> {
   bool _isValidProjectName(String name) {
     final regex = RegExp(r'^[a-z][a-z0-9_]*$');
     return regex.hasMatch(name);
-  }
-
-  /// 打印步骤标题 / Prints a step header
-  void _step(String message) {
-    _logger.info('\n$message');
   }
 
   /// 打印完成信息 / Prints completion message
@@ -299,7 +329,7 @@ class CreateCommand extends Command<int> {
   // ---------------------------------------------------------------------------
 
   /// 默认的 flutter create 执行器 / Default flutter create runner
-  static Future<int> _defaultFlutterCreate(
+  Future<int> _defaultFlutterCreate(
     String projectRoot, {
     String? projectName,
     String? org,
@@ -311,30 +341,41 @@ class CreateCommand extends Command<int> {
     if (org != null) {
       args.addAll(['--org', org]);
     }
-    return ProcessRunner.run('flutter', args, workingDirectory: projectRoot);
+    return ProcessRunner.run(
+      'flutter',
+      args,
+      workingDirectory: projectRoot,
+      showLive: _logger.level == Level.verbose,
+    );
   }
 
   /// 默认的 flutter pub get 执行器 / Default flutter pub get runner
-  static Future<int> _defaultFlutterPubGet(String projectRoot) {
-    return ProcessRunner.run('flutter', [
-      'pub',
-      'get',
-    ], workingDirectory: projectRoot);
+  Future<int> _defaultFlutterPubGet(String projectRoot) {
+    return ProcessRunner.run(
+      'flutter',
+      ['pub', 'get'],
+      workingDirectory: projectRoot,
+      showLive: _logger.level == Level.verbose,
+    );
   }
 
   /// 默认的 flutter gen-l10n 执行器 / Default flutter gen-l10n runner
-  static Future<int> _defaultFlutterGenL10n(String projectRoot) {
-    return ProcessRunner.run('flutter', [
-      'gen-l10n',
-    ], workingDirectory: projectRoot);
+  Future<int> _defaultFlutterGenL10n(String projectRoot) {
+    return ProcessRunner.run(
+      'flutter',
+      ['gen-l10n'],
+      workingDirectory: projectRoot,
+      showLive: _logger.level == Level.verbose,
+    );
   }
 
   /// 默认的 build_runner 执行器 / Default build_runner runner
-  static Future<int> _defaultBuildRunner(String projectRoot) {
-    return ProcessRunner.run('dart', [
-      'run',
-      'build_runner',
-      'build',
-    ], workingDirectory: projectRoot);
+  Future<int> _defaultBuildRunner(String projectRoot) {
+    return ProcessRunner.run(
+      'dart',
+      ['run', 'build_runner', 'build'],
+      workingDirectory: projectRoot,
+      showLive: _logger.level == Level.verbose,
+    );
   }
 }
