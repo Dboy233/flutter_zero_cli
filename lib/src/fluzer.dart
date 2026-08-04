@@ -3,6 +3,8 @@
 // 职责：解析参数、分发到对应命令
 // Responsibility: parse arguments, dispatch to commands
 
+import 'dart:io';
+
 import 'package:args/command_runner.dart';
 import 'package:mason_logger/mason_logger.dart';
 
@@ -15,7 +17,21 @@ import 'commands/version_command.dart';
 /// CLI 主类，注册并分发命令 / Main CLI class, registers and dispatches commands
 class Fluzer {
   /// 创建 CLI 实例 / Creates a CLI instance
-  const Fluzer();
+  ///
+  /// [workingDirectory] 指定命令运行的工作目录（向上查找项目配置的起点），
+  /// 省略时回退到当前工作目录；测试注入临时目录以避免依赖全局 cwd。
+  ///
+  /// [workingDirectory] pins the working directory commands run in (start dir
+  /// for walking up to the project config); defaults to the current directory.
+  /// Tests inject a temp dir so they never mutate the global cwd.
+  const Fluzer({this.workingDirectory});
+
+  /// 命令运行的工作目录（向上查找项目配置的起点）。
+  /// 省略时回退到当前工作目录。
+  ///
+  /// Working directory commands run in (start dir for walking up to the project
+  /// config). Defaults to the current directory.
+  final Directory? workingDirectory;
 
   /// 运行 CLI / Runs the CLI
   Future<int> run(List<String> arguments) async {
@@ -41,9 +57,9 @@ class Fluzer {
             help: '调试模式：显示详细日志、子进程原始输出与异常堆栈 / '
                 'Debug mode: verbose logs, raw subprocess output and stack traces',
           )
-          ..addCommand(CreateCommand(logger: logger))
-          ..addCommand(NewCommand(logger: logger))
-          ..addCommand(GenL10nCommand(logger: logger))
+          ..addCommand(CreateCommand(logger: logger, workingDirectory: workingDirectory))
+          ..addCommand(NewCommand(logger: logger, workingDirectory: workingDirectory))
+          ..addCommand(GenL10nCommand(logger: logger, workingDirectory: workingDirectory))
           ..addCommand(VersionCommand(logger: logger))
           ..addCommand(CacheCommand(logger: logger));
 

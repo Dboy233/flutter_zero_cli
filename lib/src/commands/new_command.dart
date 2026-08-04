@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:args/command_runner.dart';
 import 'package:mason_logger/mason_logger.dart';
 
@@ -24,17 +26,22 @@ class NewCommand extends Command<int> {
   ///
   /// [loader] 用于注入 Brick 加载器（测试可用本地临时目录）；
   /// [buildRunner] 用于注入 build_runner 执行器；
+  /// [workingDirectory] 指定项目根目录（向上查找 `flutter_zero_config.yaml` 的起点），
+  /// 省略时回退到当前工作目录；测试可传入临时项目目录以避免依赖全局 cwd。
   /// 二者均省略时按环境变量自动解析 / 使用默认实现。
   ///
   /// Creates a NewCommand instance.
   ///
   /// [loader] injects a [BrickLoader] (tests use a temp local dir);
   /// [buildRunner] injects the build_runner executor;
-  /// when omitted they resolve from env / use defaults.
+  /// [workingDirectory] pins the project root (start dir for walking up to
+  /// `flutter_zero_config.yaml`); defaults to the current directory. Tests pass
+  /// a temp project dir so they never mutate the global cwd.
   NewCommand({
     Logger? logger,
     BrickLoader? loader,
     BuildRunnerRunner? buildRunner,
+    this.workingDirectory,
   }) : _logger = logger ?? Logger(),
        // ignore: prefer_initializing_formals
        _loader = loader {
@@ -59,6 +66,14 @@ class NewCommand extends Command<int> {
 
   final Logger _logger;
   final BrickLoader? _loader;
+
+  /// 项目根目录（向上查找 `flutter_zero_config.yaml` 的起点）。
+  /// 省略时回退到当前工作目录。测试注入临时目录以避免依赖全局 cwd。
+  ///
+  /// Project root (start dir for walking up to `flutter_zero_config.yaml`).
+  /// Defaults to the current directory; tests inject a temp dir to avoid
+  /// mutating the global cwd.
+  final Directory? workingDirectory;
   late final BuildRunnerRunner _buildRunner;
 
   @override
@@ -87,7 +102,7 @@ class NewCommand extends Command<int> {
         logger: _logger,
         message: '步骤 1/4：加载项目配置与版本门禁 ...',
         work: () async {
-          config = await ProjectConfig.load();
+          config = await ProjectConfig.load(start: workingDirectory);
           _logger.detail('  项目根目录: ${config.projectRoot}');
           _logger.detail(
             '  项目模板版本: ${config.version}，要求 CLI >= ${config.minCliVersion}',

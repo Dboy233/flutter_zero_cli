@@ -340,34 +340,29 @@ void main() {
     // -----------------------------------------------------------------------
     group('CreateCommand', () {
       late Directory sandbox;
-      late Directory originalCwd;
 
       setUp(() {
         sandbox = Directory.systemTemp.createTempSync('fluzer_create_cmd_');
-        originalCwd = Directory.current;
-        // create 命令以 Directory.current 为基准拼接目标目录
-        Directory.current = sandbox;
       });
 
       tearDown(() async {
-        Directory.current = originalCwd;
         await deleteTempDir(sandbox);
       });
 
       test('缺少项目名 → 返回 1 / missing project name returns 1', () async {
-        final code = await runnerWith(CreateCommand()).run(['create']);
+        final code = await runnerWith(CreateCommand(workingDirectory: sandbox)).run(['create']);
         expect(code, 1);
       });
 
       test('非法项目名 → 返回 1 / invalid project name returns 1', () async {
         final code =
-            await runnerWith(CreateCommand()).run(['create', 'Bad-Name']);
+            await runnerWith(CreateCommand(workingDirectory: sandbox)).run(['create', 'Bad-Name']);
         expect(code, 1);
       });
 
       test('目标目录已存在 → 返回 1 / existing target dir returns 1', () async {
         Directory(path.join(sandbox.path, 'existing_app')).createSync();
-        final code = await runnerWith(CreateCommand())
+        final code = await runnerWith(CreateCommand(workingDirectory: sandbox))
             .run(['create', 'existing_app']);
         expect(code, 1);
       });
@@ -378,6 +373,7 @@ void main() {
           final bricksRoot = await _buildProjectBrick(sandbox);
           final cmd = CreateCommand(
             loader: LocalBrickLoader(bricksRoot),
+            workingDirectory: sandbox,
             flutterCreate: (_, {String? projectName, String? org}) async => 0,
             flutterPubGet: (_) async => 0,
             flutterGenL10n: (_) async => 0,
@@ -400,6 +396,7 @@ void main() {
           final bricksRoot = await _buildProjectBrick(sandbox);
           final cmd = CreateCommand(
             loader: LocalBrickLoader(bricksRoot),
+            workingDirectory: sandbox,
             flutterCreate: (_, {String? projectName, String? org}) async => 1,
             flutterPubGet: (_) async => 0,
             flutterGenL10n: (_) async => 0,
@@ -422,7 +419,6 @@ void main() {
     // -----------------------------------------------------------------------
     group('NewCommand', () {
       late Directory sandbox;
-      late Directory originalCwd;
       late Directory bricksRoot;
       late Directory projectDir;
 
@@ -430,18 +426,14 @@ void main() {
         sandbox = Directory.systemTemp.createTempSync('fluzer_new_cmd_');
         bricksRoot = await _buildFeatureBrick(sandbox);
         projectDir = await _buildProject(sandbox);
-        originalCwd = Directory.current;
-        // new 命令通过 ProjectConfig.load() 从当前目录向上查找工程
-        Directory.current = projectDir;
       });
 
       tearDown(() async {
-        Directory.current = originalCwd;
         await deleteTempDir(sandbox);
       });
 
       test('缺少功能名 → 返回 1 / missing feature name returns 1', () async {
-        final code = await runnerWith(NewCommand()).run(['new']);
+        final code = await runnerWith(NewCommand(workingDirectory: projectDir)).run(['new']);
         expect(code, 1);
       });
 
@@ -451,6 +443,7 @@ void main() {
         () async {
           final cmd = NewCommand(
             loader: LocalBrickLoader(bricksRoot),
+            workingDirectory: projectDir,
             buildRunner: (_) async => 0,
           );
           final code = await runnerWith(cmd).run(['new', 'user_profile']);

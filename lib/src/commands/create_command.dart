@@ -74,6 +74,7 @@ class CreateCommand extends Command<int> {
     CreateFlutterPubGetRunner? flutterPubGet,
     CreateFlutterGenL10nRunner? flutterGenL10n,
     CreateBuildRunnerRunner? buildRunner,
+    this.workingDirectory,
   }) : _logger = logger ?? Logger(),
        // ignore: prefer_initializing_formals
        _loader = loader {
@@ -96,6 +97,14 @@ class CreateCommand extends Command<int> {
 
   final Logger _logger;
   final BrickLoader? _loader;
+
+  /// 工作目录（渲染输出与拼接目标目录的基准）。
+  /// 省略时回退到当前工作目录。测试注入临时目录以避免依赖全局 cwd。
+  ///
+  /// Working directory (base for rendering output and the target dir).
+  /// Defaults to the current directory; tests inject a temp dir to avoid
+  /// mutating the global cwd.
+  final Directory? workingDirectory;
   late final CreateFlutterCreateRunner _flutterCreate;
   late final CreateFlutterPubGetRunner _flutterPubGet;
   late final CreateFlutterGenL10nRunner _flutterGenL10n;
@@ -133,8 +142,9 @@ class CreateCommand extends Command<int> {
     final org = argResults!['org'] as String;
     final runBuildRunner = argResults!['build-runner'] as bool;
 
-    // 目标目录 = 当前工作目录 + 项目名（即 Mason 渲染出的 {{name}} 目录）
-    final targetDir = p.join(Directory.current.path, projectName);
+    // 目标目录 = 工作目录 + 项目名（即 Mason 渲染出的 {{name}} 目录）
+    final baseDir = workingDirectory?.path ?? Directory.current.path;
+    final targetDir = p.join(baseDir, projectName);
 
     try {
       // 每一步骤都用 runWithSpinner 给出「正在执行」的旋转反馈；
@@ -173,7 +183,7 @@ class CreateCommand extends Command<int> {
           final renderer = BrickRenderer(brickLoader);
           await renderer.generate(
             brickName: 'project',
-            outputDir: Directory.current,
+            outputDir: workingDirectory ?? Directory.current,
             vars: {'name': projectName},
           );
           _logger.detail('  已生成 $targetDir');

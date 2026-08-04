@@ -27,9 +27,14 @@ class GenL10nCommand extends Command<int> {
   /// 创建 GenL10nCommand 实例。
   ///
   /// [flutterGenL10nFn] 用于注入 flutter gen-l10n 执行器（测试用 stub）；
+  /// [workingDirectory] 指定项目根目录（向上查找 `flutter_zero_config.yaml`
+  /// 的起点），省略时回退到当前工作目录；测试可注入临时目录以避免依赖全局 cwd。
   /// 省略时使用默认实现。
-  GenL10nCommand({Logger? logger, FlutterGenL10nRunner? flutterGenL10nFn})
-    : _logger = logger ?? Logger() {
+  GenL10nCommand({
+    Logger? logger,
+    FlutterGenL10nRunner? flutterGenL10nFn,
+    this.workingDirectory,
+  }) : _logger = logger ?? Logger() {
     _flutterGenL10n = flutterGenL10nFn ?? _defaultFlutterGenL10n;
     argParser
       ..addFlag(
@@ -56,6 +61,14 @@ class GenL10nCommand extends Command<int> {
   }
 
   final Logger _logger;
+
+  /// 项目根目录（向上查找 `flutter_zero_config.yaml` 的起点）。
+  /// 省略时回退到当前工作目录。测试注入临时目录以避免依赖全局 cwd。
+  ///
+  /// Project root (start dir for walking up to `flutter_zero_config.yaml`).
+  /// Defaults to the current directory; tests inject a temp dir to avoid
+  /// mutating the global cwd.
+  final Directory? workingDirectory;
   late final FlutterGenL10nRunner _flutterGenL10n;
 
   /// 标记 defaultToastHandle 文件是否不存在（用于区分「文件缺失」与「锚点缺失」）。
@@ -87,7 +100,7 @@ class GenL10nCommand extends Command<int> {
         logger: _logger,
         message: '步骤 1/6：校验项目与版本门禁 ...',
         work: () async {
-          config = await ProjectConfig.load();
+          config = await ProjectConfig.load(start: workingDirectory);
           projectRoot = config.projectRoot;
           // 版本门禁：gen-l10n 不下载模板，门禁通过即继续执行。
           if (!(argResults!['skip-version-check'] as bool) &&

@@ -74,13 +74,9 @@ void main() {
     });
 
     Future<void> runInProject(List<String> args) async {
-      final previous = Directory.current;
-      Directory.current = tempDir;
-      try {
-        await Fluzer().run(args);
-      } finally {
-        Directory.current = previous;
-      }
+      // 通过 Fluzer(workingDirectory:) 注入临时工程目录，避免修改全局
+      // Directory.current（进程级状态，dart test 并行下会跨测试互相踩踏）。
+      await Fluzer(workingDirectory: tempDir).run(args);
     }
 
     test('--log 时 gen-l10n 的 showLive 为 true（显示子进程输出）', () async {
