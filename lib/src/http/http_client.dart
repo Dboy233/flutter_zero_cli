@@ -24,6 +24,15 @@ import 'race_http_client.dart';
 /// Unified HTTP client with mirror-fallback racing. Tries the direct URL and
 /// every configured mirror prefix concurrently; the first success wins and
 /// the rest are cancelled. Returns `null` when all attempts fail.
+/// 是否显示下载进度条。
+///
+/// 仅在 `--log`（verbose 级别）且为交互终端时显示；默认模式由
+/// [runWithSpinner] 的旋转 spinner 体现进度，避免重复输出与空行干扰。
+/// 将 [hasTerminal] 作为参数传入，便于在测试（通常无终端）中显式断言
+/// 各级别组合下的显示决策。
+bool shouldShowDownloadProgress(Logger? logger, bool hasTerminal) =>
+    hasTerminal && logger?.level == Level.verbose;
+
 class FluzerHttpClient {
   /// 创建客户端。
   ///
@@ -84,10 +93,13 @@ class FluzerHttpClient {
   /// fail. The caller must call [DownloadedFile.dispose] after use.
   Future<DownloadedFile?> downloadFile(String url) async {
     final urls = _buildCandidateUrls(url);
-    final hasTerminal = stdout.hasTerminal;
+    // 进度条仅在 --log（verbose 级别）且为交互终端时显示；默认模式由
+    // runWithSpinner 的旋转 spinner 体现进度，避免重复输出与空行干扰。
+    final showProgress =
+        shouldShowDownloadProgress(_logger, stdout.hasTerminal);
 
     void onProgress(String url, int received, int total) {
-      if (!hasTerminal || total <= 0) return;
+      if (!showProgress || total <= 0) return;
       final percent = (received / total * 100).floor();
       final filled = (percent / 100 * 40).floor();
       final bar = '${'=' * filled}>${' ' * (40 - filled - 1)}';
@@ -101,7 +113,7 @@ class FluzerHttpClient {
       onProgress: onProgress,
       onFailure: _logFailure,
     );
-    if (hasTerminal) stdout.writeln();
+    if (showProgress) stdout.writeln();
 
     if (result == null) {
       _logger?.err('所有候选地址（直连 + 镜像）下载均失败。');

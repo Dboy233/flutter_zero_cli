@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:fluzer/src/http/http_client.dart';
+import 'package:mason_logger/mason_logger.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -82,6 +83,33 @@ void main() {
       final client = FluzerHttpClient(dio: Dio());
       final file = await client.downloadFile('http://127.0.0.1:$port/fail');
       expect(file, isNull);
+    });
+  });
+
+  group('shouldShowDownloadProgress（下载进度条显示决策）', () {
+    test('默认 info 级别 + 终端 → 不显示', () {
+      expect(
+        shouldShowDownloadProgress(Logger(level: Level.info), true),
+        isFalse,
+      );
+    });
+
+    test('未注入 logger → 不显示', () {
+      expect(shouldShowDownloadProgress(null, true), isFalse);
+    });
+
+    test('--log（verbose）级别 + 终端 → 显示', () {
+      expect(
+        shouldShowDownloadProgress(Logger(level: Level.verbose), true),
+        isTrue,
+      );
+    });
+
+    test('verbose 但非终端 → 不显示', () {
+      expect(
+        shouldShowDownloadProgress(Logger(level: Level.verbose), false),
+        isFalse,
+      );
     });
   });
 }

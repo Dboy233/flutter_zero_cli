@@ -74,6 +74,7 @@ class TemplateSourceResolver {
       return RemoteBrickLoader(
         zipUrl: overrideUrl,
         templateVersion: RegularUtils.extractVersion(overrideUrl),
+        httpClient: _httpClient,
       );
     }
     // 3. 远程：从 registry 选取模板 zip URL（失败回退内置默认值）。
