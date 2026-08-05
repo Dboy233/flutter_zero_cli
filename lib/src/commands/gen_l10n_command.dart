@@ -13,6 +13,8 @@ import '../gen_l10n/l10n_parser.dart';
 import '../gen_l10n/toast_handle_patcher.dart';
 import '../logging/spinner.dart';
 import '../process/process_runner.dart';
+import '../version/version_check.dart';
+import '../version/version_check_mixin.dart';
 
 /// `flutter gen-l10n` 执行器签名。
 typedef FlutterGenL10nRunner = Future<int> Function(String projectRoot);
@@ -23,7 +25,7 @@ typedef FlutterGenL10nRunner = Future<int> Function(String projectRoot);
 /// `gen-l10n` command: runs Flutter localization code generation and
 /// auto-generates the L10nCode value object, toast-type extension and
 /// the centralized toast dispatcher.
-class GenL10nCommand extends Command<int> {
+class GenL10nCommand extends Command<int> with VersionCheckMixin {
   /// 创建 GenL10nCommand 实例。
   ///
   /// [flutterGenL10nFn] 用于注入 flutter gen-l10n 执行器（测试用 stub）；
@@ -34,7 +36,11 @@ class GenL10nCommand extends Command<int> {
     Logger? logger,
     FlutterGenL10nRunner? flutterGenL10nFn,
     this.workingDirectory,
-  }) : _logger = logger ?? Logger() {
+    VersionCheckService? versionCheckService,
+  }) : _logger = logger ?? Logger(),
+       _versionCheckService =
+           versionCheckService ??
+           VersionCheckService(logger: logger ?? Logger()) {
     _flutterGenL10n = flutterGenL10nFn ?? _defaultFlutterGenL10n;
     argParser
       ..addFlag(
@@ -62,6 +68,18 @@ class GenL10nCommand extends Command<int> {
 
   final Logger _logger;
 
+  /// 注入的版本检查服务（测试用）；省略时创建默认实例。
+  ///
+  /// Injected version-check service (for tests); creates a default instance
+  /// when omitted.
+  final VersionCheckService _versionCheckService;
+
+  @override
+  Logger get logger => _logger;
+
+  @override
+  VersionCheckService get versionCheckService => _versionCheckService;
+
   /// 项目根目录（向上查找 `flutter_zero_config.yaml` 的起点）。
   /// 省略时回退到当前工作目录。测试注入临时目录以避免依赖全局 cwd。
   ///
@@ -84,6 +102,10 @@ class GenL10nCommand extends Command<int> {
 
   @override
   Future<int> run() async {
+    // 启动版本检查提示（缓存命中瞬时提示，缓存未命中以 spinner 包裹网络等待）；
+    // 无更新 / 网络异常静默降级，不阻断主流程。
+    await ensureUpdateNotified();
+
     late String projectRoot;
     late ProjectConfig config;
     late L10nConfig l10nConfig;
@@ -154,7 +176,7 @@ class GenL10nCommand extends Command<int> {
           );
         },
       );
-      _logger.info(
+      _logger.success(
         '找到 ${arbFiles.length} 个 .arb 文件 / '
         'Found ${arbFiles.length} .arb file(s)',
       );
@@ -172,7 +194,6 @@ class GenL10nCommand extends Command<int> {
         );
         return exitCode;
       }
-      _logger.success('flutter gen-l10n 执行完成。');
 
       // 4. 解析本地化成员
       await runWithSpinner(

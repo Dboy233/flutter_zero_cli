@@ -11,17 +11,17 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:mason_logger/mason_logger.dart';
 
-import '../util/semantic_version.dart';
 import '../config/template_config.dart';
-
-/// 模块级复用的 Dio 实例（用于 pub.dev 版本查询）。
-///
-/// Shared Dio instance for pub.dev version queries.
-final Dio _dio = Dio();
+import '../util/semantic_version.dart';
 
 /// 默认查询的 pub.dev 包名 / Default pub.dev package name to check.
 const String cliPackageName = 'fluzer';
+
+// ---------------------------------------------------------------------------
+// 值对象 / Value objects
+// ---------------------------------------------------------------------------
 
 /// 版本检查结果 / Result of a version check.
 class VersionCheckResult {
@@ -54,124 +54,222 @@ class VersionCheckResult {
   factory VersionCheckResult.unavailable({
     required String current,
     required String packageName,
-  }) =>
-      VersionCheckResult(
-        current: current,
-        latest: current,
-        hasUpdate: false,
-        packageName: packageName,
-        available: false,
-      );
+  }) => VersionCheckResult(
+    current: current,
+    latest: current,
+    hasUpdate: false,
+    packageName: packageName,
+    available: false,
+  );
 }
 
-/// 检查指定包是否有新版本。
+/// 单条版本缓存条目。
 ///
-/// 默认查询 [cliPackageName]（即 fluzer 自身）。[packageName] 可传入任意
-/// 已发布的 pub 包，便于在未发布 CLI 时验证解析逻辑（如测试用 `args`）。
+/// A single cached version-check entry for one package.
+class VersionCacheEntry {
+  const VersionCacheEntry({
+    this.latest,
+    this.available = true,
+    required this.checkedAt,
+  });
+
+  /// 远端最新版本；null 表示本次检查不可达 / Cached latest; null = unavailable.
+  final String? latest;
+
+  /// API 是否可达 / Whether the API was reachable.
+  final bool available;
+
+  /// 缓存时间戳（毫秒）/ Cached timestamp in milliseconds.
+  final int checkedAt;
+
+  factory VersionCacheEntry.fromJson(Map<String, dynamic> json) {
+    return VersionCacheEntry(
+      latest: json['latest'] as String?,
+      available: json['available'] as bool? ?? true,
+      checkedAt: json['checkedAt'] as int? ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'latest': latest,
+    'available': available,
+    'checkedAt': checkedAt,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 服务类 / Service
+// ---------------------------------------------------------------------------
+
+/// 版本检查服务——外观模式封装缓存、网络查询与版本比较。
 ///
-/// Checks whether a newer version of [packageName] exists on pub.dev.
-Future<VersionCheckResult> checkForUpdate({
-  String packageName = cliPackageName,
-}) async {
-  final cached = _readCache()[packageName] as Map<String, dynamic>?;
-  if (cached != null) {
-    final available = cached['available'] as bool? ?? true;
-    final checkedAt = cached['checkedAt'] as int? ?? 0;
-    // 可用结果缓存 24h；不可用结果（包未发布 / 网络异常）只缓存 10 分钟，
-    // 避免每次执行都白等网络超时，同时保证恢复后较快重新探测。
-    final stale = available ? _isStale(checkedAt) : _isRecentUnavailable(checkedAt);
-    if (!stale) {
-      if (!available) {
+/// [logger] 与 [dio] 通过构造注入，满足依赖倒置（DIP）；实例化后所有方法
+/// 均可直接访问共享依赖，无需逐方法传递参数。
+///
+/// Facade that wraps cache I/O, pub.dev querying, and version comparison.
+/// [logger] and [dio] are constructor-injected (DIP); once constructed, every
+/// method has direct access to the shared dependencies.
+class VersionCheckService {
+  VersionCheckService({Logger? logger, Dio? dio})
+    : _logger = logger ?? Logger(),
+      _dio = dio ?? Dio();
+
+  final Logger _logger;
+  final Dio _dio;
+
+  // ---- 公共 API ----
+
+  /// 同步读取缓存中的版本检查结果（不触网）。
+  ///
+  /// 仅当缓存存在且未过期时返回结果；否则返回 null，调用方需自行发起网络检查。
+  ///
+  /// Synchronous read of the cached version check (no network).
+  VersionCheckResult? peekCachedUpdate({String packageName = cliPackageName}) {
+    final entry = _readCache()[packageName];
+    if (entry == null) return null;
+    // 可用结果缓存 24h；不可用结果（包未发布 / 网络异常）只缓存 10 分钟。
+    final stale = entry.available
+        ? _isStale(entry.checkedAt)
+        : _isRecentUnavailable(entry.checkedAt);
+    if (stale) {
+      _logger.detail(
+        'Version check cache expired for $packageName, will re-fetch',
+      );
+      return null;
+    }
+    if (!entry.available) {
+      _logger.detail('Version check cache: $packageName unavailable');
+      return VersionCheckResult.unavailable(
+        current: cliVersion,
+        packageName: packageName,
+      );
+    }
+    final latest = entry.latest ?? cliVersion;
+    final hasUpdate =
+        SemanticVersion.parse(latest) > SemanticVersion.parse(cliVersion);
+    _logger.detail(
+      'Version check cache: $packageName latest=$latest, hasUpdate=$hasUpdate',
+    );
+    return VersionCheckResult(
+      current: cliVersion,
+      latest: latest,
+      hasUpdate: hasUpdate,
+      packageName: packageName,
+    );
+  }
+
+  /// 检查指定包是否有新版本。
+  ///
+  /// 先读缓存（[peekCachedUpdate]），命中直接返回；否则查询 pub.dev。
+  ///
+  /// Checks whether a newer version exists on pub.dev.
+  /// Reads the cache first; falls back to a network request when stale/missing.
+  Future<VersionCheckResult> checkForUpdate({
+    String packageName = cliPackageName,
+  }) async {
+    final cached = peekCachedUpdate(packageName: packageName);
+    if (cached != null) {
+      _logger.detail('Version check: using cached result for $packageName');
+      return cached;
+    }
+
+    try {
+      _logger.detail('Checking updates for $packageName on pub.dev...');
+      final response = await _dio.get<dynamic>(
+        'https://pub.dev/api/packages/$packageName',
+        options: Options(
+          responseType: ResponseType.json,
+          receiveTimeout: const Duration(seconds: 3),
+          validateStatus: (_) => true,
+        ),
+      );
+      if (response.statusCode != 200) {
+        _logger.detail(
+          'pub.dev returned ${response.statusCode} for $packageName, treating as unavailable',
+        );
+        _writeCache(packageName, null);
         return VersionCheckResult.unavailable(
           current: cliVersion,
           packageName: packageName,
         );
       }
-      final latest = cached['latest'] as String? ?? cliVersion;
+      final data = response.data as Map<String, dynamic>;
+      final latest = (data['latest']?['version'] as String?) ?? cliVersion;
+      final hasUpdate =
+          SemanticVersion.parse(latest) > SemanticVersion.parse(cliVersion);
+      _logger.detail(
+        'pub.dev: $packageName current=$cliVersion, latest=$latest, hasUpdate=$hasUpdate',
+      );
+      _writeCache(packageName, latest);
       return VersionCheckResult(
         current: cliVersion,
         latest: latest,
-        hasUpdate: SemanticVersion.parse(latest) > SemanticVersion.parse(cliVersion),
+        hasUpdate: hasUpdate,
         packageName: packageName,
       );
-    }
-  }
-
-  try {
-    final response = await _dio.get<dynamic>(
-      'https://pub.dev/api/packages/$packageName',
-      options: Options(
-        responseType: ResponseType.json,
-        receiveTimeout: const Duration(seconds: 3),
-        validateStatus: (_) => true,
-      ),
-    );
-    if (response.statusCode != 200) {
+    } on Object catch (e) {
+      _logger.detail('Version check failed for $packageName: $e');
       _writeCache(packageName, null);
       return VersionCheckResult.unavailable(
         current: cliVersion,
         packageName: packageName,
       );
     }
-    final data = response.data as Map<String, dynamic>;
-    final latest = (data['latest']?['version'] as String?) ?? cliVersion;
-    _writeCache(packageName, latest);
-    return VersionCheckResult(
-      current: cliVersion,
-      latest: latest,
-      hasUpdate: SemanticVersion.parse(latest) > SemanticVersion.parse(cliVersion),
-      packageName: packageName,
-    );
-  } on Object {
-    return VersionCheckResult.unavailable(
-      current: cliVersion,
-      packageName: packageName,
-    );
   }
-}
 
-/// 缓存目录（复用 CLI 的临时缓存区）/ Cache directory.
-String get _cacheDir => '${Directory.systemTemp.path}/$cacheDirName';
+  // ---- 私有：缓存 I/O ----
 
-String get _cacheFile => '$_cacheDir/version_check.json';
+  String get _cacheDir => '${Directory.systemTemp.path}/$cacheDirName';
 
-Map<String, dynamic> _readCache() {
-  try {
-    final file = File(_cacheFile);
-    if (!file.existsSync()) return const {};
-    return jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
-  } on Object {
-    return const {};
+  String get _cacheFile => '$_cacheDir/version_check.json';
+
+  Map<String, VersionCacheEntry> _readCache() {
+    try {
+      final file = File(_cacheFile);
+      if (!file.existsSync()) return {};
+      final raw = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      return raw.map(
+        (k, v) =>
+            MapEntry(k, VersionCacheEntry.fromJson(v as Map<String, dynamic>)),
+      );
+    } on Object catch (e) {
+      _logger.detail('Cache read failed: $e');
+      return {};
+    }
   }
-}
 
-/// 写入缓存。[latest] 为 null 表示本次检查不可用（包未发布 / 网络异常）。
-void _writeCache(String packageName, String? latest) {
-  try {
-    final dir = Directory(_cacheDir);
-    if (!dir.existsSync()) dir.createSync(recursive: true);
-    final file = File(_cacheFile);
-    final all = _readCache();
-    all[packageName] = {
-      'latest': latest,
-      'available': latest != null,
-      'checkedAt': DateTime.now().millisecondsSinceEpoch,
-    };
-    file.writeAsStringSync(jsonEncode(all));
-  } on Object {
-    // 缓存写入失败不影响主流程 / Ignore cache write failures.
+  /// 写入缓存。[latest] 为 null 表示本次检查不可用（包未发布 / 网络异常）。
+  void _writeCache(String packageName, String? latest) {
+    try {
+      final dir = Directory(_cacheDir);
+      if (!dir.existsSync()) dir.createSync(recursive: true);
+      final file = File(_cacheFile);
+      final all = _readCache();
+      all[packageName] = VersionCacheEntry(
+        latest: latest,
+        available: latest != null,
+        checkedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+      final json = <String, dynamic>{};
+      for (final e in all.entries) {
+        json[e.key] = e.value.toJson();
+      }
+      file.writeAsStringSync(jsonEncode(json));
+    } on Object catch (e) {
+      _logger.detail('Cache write failed: $e');
+    }
   }
-}
 
-bool _isStale(int checkedAt) {
-  // 24 小时的毫秒数 / 24h in milliseconds.
-  const ttlMillis = 24 * 60 * 60 * 1000;
-  return DateTime.now().millisecondsSinceEpoch - checkedAt > ttlMillis;
-}
+  // ---- 私有：过期策略 ----
 
-/// 不可用结果是否仍在 10 分钟缓存窗口内（返回 true 表示已过期，需重新探测）。
-bool _isRecentUnavailable(int checkedAt) {
-  // 10 分钟的毫秒数 / 10min in milliseconds.
-  const ttlMillis = 10 * 60 * 1000;
-  return DateTime.now().millisecondsSinceEpoch - checkedAt > ttlMillis;
+  bool _isStale(int checkedAt) {
+    const ttlMillis = 24 * 60 * 60 * 1000; // 24h
+    return DateTime.now().millisecondsSinceEpoch - checkedAt > ttlMillis;
+  }
+
+  /// 不可用结果是否已超过 10 分钟缓存窗口（true = 过期，需重新探测）。
+  bool _isRecentUnavailable(int checkedAt) {
+    const ttlMillis = 10 * 60 * 1000; // 10min
+    return DateTime.now().millisecondsSinceEpoch - checkedAt > ttlMillis;
+  }
 }

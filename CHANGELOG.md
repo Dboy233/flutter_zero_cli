@@ -1,3 +1,10 @@
+## 1.1.3
+
+### Changed
+
+- `create`, `new` and `gen-l10n` now perform a silent version-update check at startup (via the new `VersionCheckMixin`): a cached hit with an available update shows a one-line hint instantly, otherwise the check runs behind a spinner only when the cache is stale. No update or unreachable network degrades silently without blocking the command.
+- The `version` command now wraps its network update check in `runWithSpinner`, giving a live "checking for updates…" progress indication instead of blocking silently.
+
 ## 1.1.2
 
 ### Added

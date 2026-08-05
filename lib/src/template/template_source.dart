@@ -127,7 +127,8 @@ class TemplateSourceResolver {
         return (url: defaultTemplateZipUrl, version: null);
       }
       return (url: bestUrl, version: bestVersion.toString());
-    } on Object {
+    } on Object catch (e) {
+      _logger.detail('Registry fetch failed, using default template zip: $e');
       return (url: defaultTemplateZipUrl, version: null);
     }
   }

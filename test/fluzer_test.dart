@@ -10,6 +10,7 @@ import 'dart:io';
 
 import 'package:args/command_runner.dart';
 import 'package:codemod_recipe/codemod_recipe.dart';
+import 'package:mason_logger/mason_logger.dart';
 import 'package:fluzer/src/codemod/code_mod.dart';
 import 'package:fluzer/src/codemod/insert_at_method_end_transform.dart';
 import 'package:fluzer/src/codemod/ordered_import_transform.dart';
@@ -26,6 +27,43 @@ import 'package:path/path.dart' as path;
 import 'package:test/test.dart';
 
 import 'test_utils.dart';
+
+/// 测试中注入「无更新」的版本检查服务，避免触达 pub.dev 网络。
+///
+/// Injects a no-update version-check service so tests never hit pub.dev.
+VersionCheckService get _noopVersionCheckService => _NoopVersionCheckService();
+
+class _NoopVersionCheckService extends VersionCheckService {
+  @override
+  VersionCheckResult? peekCachedUpdate({
+    String packageName = cliPackageName,
+  }) =>
+      null;
+
+  @override
+  Future<VersionCheckResult> checkForUpdate({
+    String packageName = cliPackageName,
+  }) async =>
+      VersionCheckResult.unavailable(
+        current: '1.0.0',
+        packageName: packageName,
+      );
+}
+
+/// spy 版版本检查服务，可注入回调控制 [checkForUpdate] 返回值。
+///
+/// Spy service that injects a callback to control [checkForUpdate] return value.
+class _SpyVersionCheckService extends VersionCheckService {
+  _SpyVersionCheckService(this._onCheck, {super.logger});
+
+  final Future<VersionCheckResult> Function() _onCheck;
+
+  @override
+  Future<VersionCheckResult> checkForUpdate({
+    String packageName = cliPackageName,
+  }) async =>
+      _onCheck();
+}
 
 /// 在 [root] 下构造一个最小可用的 feature brick。
 Future<Directory> _buildFeatureBrick(Directory root) async {
@@ -350,19 +388,34 @@ void main() {
       });
 
       test('缺少项目名 → 返回 1 / missing project name returns 1', () async {
-        final code = await runnerWith(CreateCommand(workingDirectory: sandbox)).run(['create']);
+        final code = await runnerWith(
+          CreateCommand(
+            workingDirectory: sandbox,
+            versionCheckService: _noopVersionCheckService,
+          ),
+        ).run(['create']);
         expect(code, 1);
       });
 
       test('非法项目名 → 返回 1 / invalid project name returns 1', () async {
         final code =
-            await runnerWith(CreateCommand(workingDirectory: sandbox)).run(['create', 'Bad-Name']);
+            await runnerWith(
+              CreateCommand(
+                workingDirectory: sandbox,
+                versionCheckService: _noopVersionCheckService,
+              ),
+            ).run(['create', 'Bad-Name']);
         expect(code, 1);
       });
 
       test('目标目录已存在 → 返回 1 / existing target dir returns 1', () async {
         Directory(path.join(sandbox.path, 'existing_app')).createSync();
-        final code = await runnerWith(CreateCommand(workingDirectory: sandbox))
+        final code = await runnerWith(
+          CreateCommand(
+            workingDirectory: sandbox,
+            versionCheckService: _noopVersionCheckService,
+          ),
+        )
             .run(['create', 'existing_app']);
         expect(code, 1);
       });
@@ -372,6 +425,7 @@ void main() {
         () async {
           final bricksRoot = await _buildProjectBrick(sandbox);
           final cmd = CreateCommand(
+            versionCheckService: _noopVersionCheckService,
             loader: LocalBrickLoader(bricksRoot),
             workingDirectory: sandbox,
             flutterCreate: (_, {String? projectName, String? org}) async => 0,
@@ -395,6 +449,7 @@ void main() {
         () async {
           final bricksRoot = await _buildProjectBrick(sandbox);
           final cmd = CreateCommand(
+            versionCheckService: _noopVersionCheckService,
             loader: LocalBrickLoader(bricksRoot),
             workingDirectory: sandbox,
             flutterCreate: (_, {String? projectName, String? org}) async => 1,
@@ -433,7 +488,12 @@ void main() {
       });
 
       test('缺少功能名 → 返回 1 / missing feature name returns 1', () async {
-        final code = await runnerWith(NewCommand(workingDirectory: projectDir)).run(['new']);
+        final code = await runnerWith(
+          NewCommand(
+            workingDirectory: projectDir,
+            versionCheckService: _noopVersionCheckService,
+          ),
+        ).run(['new']);
         expect(code, 1);
       });
 
@@ -442,6 +502,7 @@ void main() {
         'full flow returns 0 and registers DI',
         () async {
           final cmd = NewCommand(
+            versionCheckService: _noopVersionCheckService,
             loader: LocalBrickLoader(bricksRoot),
             workingDirectory: projectDir,
             buildRunner: (_) async => 0,
@@ -489,10 +550,13 @@ void main() {
         );
         final code = await runnerWith(
           VersionCommand(
-            checkForUpdateFn: () async {
+            versionCheckService: _SpyVersionCheckService(
+              () async {
               called = true;
               return result;
             },
+              logger: Logger(level: Level.quiet),
+            ),
           ),
         ).run(['version']);
         expect(code, 0);
@@ -507,7 +571,7 @@ void main() {
           packageName: 'fluzer',
         );
         final code = await runnerWith(
-          VersionCommand(checkForUpdateFn: () async => result),
+          VersionCommand(versionCheckService: _SpyVersionCheckService(() async => result, logger: Logger(level: Level.quiet))),
         ).run(['version']);
         expect(code, 0);
       });
@@ -518,7 +582,7 @@ void main() {
           packageName: 'fluzer',
         );
         final code = await runnerWith(
-          VersionCommand(checkForUpdateFn: () async => result),
+          VersionCommand(versionCheckService: _SpyVersionCheckService(() async => result, logger: Logger(level: Level.quiet))),
         ).run(['version']);
         expect(code, 0);
       });

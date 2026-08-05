@@ -15,6 +15,8 @@ import '../process/process_runner.dart';
 import '../template/brick_loader.dart';
 import '../template/brick_renderer.dart';
 import '../template/template_source.dart';
+import '../version/version_check.dart';
+import '../version/version_check_mixin.dart';
 
 /// 可注入的 flutter create 执行器，便于测试。
 /// / Injectable flutter create runner for testability.
@@ -59,7 +61,7 @@ typedef CreateBuildRunnerRunner = Future<int> Function(String projectRoot);
 /// 5. Run flutter pub get
 /// 6. Run flutter gen-l10n
 /// 7. Run build_runner (optional)
-class CreateCommand extends Command<int> {
+class CreateCommand extends Command<int> with VersionCheckMixin {
   /// 创建 CreateCommand 实例。
   ///
   /// 所有执行器与 [loader] 均可注入，便于测试。
@@ -75,9 +77,11 @@ class CreateCommand extends Command<int> {
     CreateFlutterGenL10nRunner? flutterGenL10n,
     CreateBuildRunnerRunner? buildRunner,
     this.workingDirectory,
+    VersionCheckService? versionCheckService,
   }) : _logger = logger ?? Logger(),
        // ignore: prefer_initializing_formals
-       _loader = loader {
+       _loader = loader,
+       _versionCheckService = versionCheckService ?? VersionCheckService(logger: logger ?? Logger()) {
     _flutterCreate = flutterCreate ?? _defaultFlutterCreate;
     _flutterPubGet = flutterPubGet ?? _defaultFlutterPubGet;
     _flutterGenL10n = flutterGenL10n ?? _defaultFlutterGenL10n;
@@ -97,6 +101,18 @@ class CreateCommand extends Command<int> {
 
   final Logger _logger;
   final BrickLoader? _loader;
+
+  /// 注入的版本检查服务（测试用）；省略时创建默认实例。
+  ///
+  /// Injected version-check service (for tests); creates a default instance
+  /// when omitted.
+  final VersionCheckService _versionCheckService;
+
+  @override
+  Logger get logger => _logger;
+
+  @override
+  VersionCheckService get versionCheckService => _versionCheckService;
 
   /// 工作目录（渲染输出与拼接目标目录的基准）。
   /// 省略时回退到当前工作目录。测试注入临时目录以避免依赖全局 cwd。
@@ -122,6 +138,10 @@ class CreateCommand extends Command<int> {
 
   @override
   Future<int> run() async {
+    // 启动版本检查提示（缓存命中瞬时提示，缓存未命中以 spinner 包裹网络等待）；
+    // 无更新 / 网络异常静默降级，不阻断主流程。
+    await ensureUpdateNotified();
+
     final projectName = argResults?.rest.firstOrNull;
     if (projectName == null) {
       _logger.err('错误：请指定项目名 / Error: please specify a project name');
@@ -314,8 +334,12 @@ class CreateCommand extends Command<int> {
   void _cleanTests(String targetDir) {
     final widgetTest = File(p.join(targetDir, 'test', 'widget_test.dart'));
     if (widgetTest.existsSync()) {
-      widgetTest.deleteSync();
-      _logger.detail('  已删除 / Removed: test/widget_test.dart');
+      try {
+        widgetTest.deleteSync();
+        _logger.detail('  已删除 / Removed: test/widget_test.dart');
+      } on Object catch (e) {
+        _logger.detail('  删除 widget_test.dart 失败: $e');
+      }
     }
   }
 
@@ -328,8 +352,8 @@ class CreateCommand extends Command<int> {
       try {
         dir.deleteSync(recursive: true);
         _logger.detail('  已清理失败目录 / Cleaned up failed directory');
-      } on Object {
-        // 清理失败不影响错误报告
+      } on Object catch (e) {
+        _logger.detail('  清理失败目录失败 / Cleanup failed: $e');
       }
     }
   }

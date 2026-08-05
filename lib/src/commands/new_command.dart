@@ -11,6 +11,8 @@ import '../template/brick_loader.dart';
 import '../template/brick_renderer.dart';
 import '../template/feature_generator.dart';
 import '../template/template_source.dart';
+import '../version/version_check.dart';
+import '../version/version_check_mixin.dart';
 
 /// build_runner 执行器签名。
 ///
@@ -21,7 +23,7 @@ typedef BuildRunnerRunner = Future<int> Function(String projectRoot);
 ///
 /// `new` command: generates a feature module in the current flutter_zero
 /// template project.
-class NewCommand extends Command<int> {
+class NewCommand extends Command<int> with VersionCheckMixin {
   /// 创建 NewCommand 实例。
   ///
   /// [loader] 用于注入 Brick 加载器（测试可用本地临时目录）；
@@ -42,9 +44,11 @@ class NewCommand extends Command<int> {
     BrickLoader? loader,
     BuildRunnerRunner? buildRunner,
     this.workingDirectory,
+    VersionCheckService? versionCheckService,
   }) : _logger = logger ?? Logger(),
        // ignore: prefer_initializing_formals
-       _loader = loader {
+       _loader = loader,
+       _versionCheckService = versionCheckService ?? VersionCheckService(logger: logger ?? Logger()) {
     _buildRunner = buildRunner ?? _defaultBuildRunner;
     argParser
       ..addFlag(
@@ -67,6 +71,18 @@ class NewCommand extends Command<int> {
   final Logger _logger;
   final BrickLoader? _loader;
 
+  /// 注入的版本检查服务（测试用）；省略时创建默认实例。
+  ///
+  /// Injected version-check service (for tests); creates a default instance
+  /// when omitted.
+  final VersionCheckService _versionCheckService;
+
+  @override
+  Logger get logger => _logger;
+
+  @override
+  VersionCheckService get versionCheckService => _versionCheckService;
+
   /// 项目根目录（向上查找 `flutter_zero_config.yaml` 的起点）。
   /// 省略时回退到当前工作目录。测试注入临时目录以避免依赖全局 cwd。
   ///
@@ -84,6 +100,10 @@ class NewCommand extends Command<int> {
 
   @override
   Future<int> run() async {
+    // 启动版本检查提示（缓存命中瞬时提示，缓存未命中以 spinner 包裹网络等待）；
+    // 无更新 / 网络异常静默降级，不阻断主流程。
+    await ensureUpdateNotified();
+
     final featureName = argResults?.rest.firstOrNull;
     if (featureName == null) {
       _logger.err('错误：请指定功能名 / Error: please specify a feature name');

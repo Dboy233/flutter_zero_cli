@@ -6,15 +6,8 @@ import 'package:args/command_runner.dart';
 import 'package:mason_logger/mason_logger.dart';
 
 import '../config/template_config.dart';
+import '../logging/spinner.dart';
 import '../version/version_check.dart';
-
-/// 可注入的更新检查函数，便于测试。
-///
-/// 默认实现为 [checkForUpdate]（查询 pub.dev，带缓存与静默降级）。
-///
-/// Injectable update-check function for testability.
-/// Defaults to [checkForUpdate] (queries pub.dev with cache & silent fallback).
-typedef CheckForUpdate = Future<VersionCheckResult> Function();
 
 /// `version` 命令：查看版本并检查更新。
 ///
@@ -22,21 +15,21 @@ typedef CheckForUpdate = Future<VersionCheckResult> Function();
 class VersionCommand extends Command<int> {
   /// 创建 VersionCommand 实例。
   ///
-  /// [checkForUpdateFn] 可注入更新检查实现（测试用），省略时回落到
-  /// 顶层的 [checkForUpdate]（查询 pub.dev）。
+  /// [versionCheckService] 可注入版本检查服务（测试用），省略时创建默认实例。
   ///
   /// Creates a VersionCommand instance.
   ///
-  /// [checkForUpdateFn] injects the update-check impl (for tests);
-  /// when omitted it falls back to the top-level [checkForUpdate].
+  /// [versionCheckService] injects the version-check service (for tests);
+  /// when omitted a default instance is created.
   VersionCommand({
     Logger? logger,
-    CheckForUpdate? checkForUpdateFn,
+    VersionCheckService? versionCheckService,
   })  : _logger = logger ?? Logger(),
-        _checkForUpdate = checkForUpdateFn ?? checkForUpdate;
+        _versionCheckService =
+            versionCheckService ?? VersionCheckService(logger: logger ?? Logger());
 
   final Logger _logger;
-  final CheckForUpdate _checkForUpdate;
+  final VersionCheckService _versionCheckService;
 
   @override
   String get name => 'version';
@@ -49,7 +42,14 @@ class VersionCommand extends Command<int> {
   Future<int> run() async {
     _logger.info('fluzer $cliVersion');
 
-    final result = await _checkForUpdate();
+    // 版本校验涉及 pub.dev 网络请求，用 spinner 体现等待过程；
+    // --log 模式下 runWithSpinner 不显示 spinner，改为直接执行。
+    final result = await runWithSpinner<VersionCheckResult>(
+      logger: _logger,
+      message: '正在检查更新…',
+      work: () => _versionCheckService.checkForUpdate(),
+    );
+
     if (!result.available) {
       _logger.info('（无法检查更新：包尚未发布或网络异常）');
       return 0;
