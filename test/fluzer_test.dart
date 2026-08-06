@@ -431,10 +431,9 @@ void main() {
             flutterCreate: (_, {String? projectName, String? org}) async => 0,
             flutterPubGet: (_) async => 0,
             flutterGenL10n: (_) async => 0,
-            buildRunner: (_, {String? buildFilter}) async => 0,
           );
           final code = await runnerWith(cmd)
-              .run(['create', 'my_app', '--no-build-runner']);
+              .run(['create', 'my_app']);
           expect(code, 0);
           final pubspec = File(
             path.join(sandbox.path, 'my_app', 'pubspec.yaml'),
@@ -455,10 +454,9 @@ void main() {
             flutterCreate: (_, {String? projectName, String? org}) async => 1,
             flutterPubGet: (_) async => 0,
             flutterGenL10n: (_) async => 0,
-            buildRunner: (_, {String? buildFilter}) async => 0,
           );
           final code = await runnerWith(cmd)
-              .run(['create', 'fail_app', '--no-build-runner']);
+              .run(['create', 'fail_app']);
           expect(code, 1);
           // 失败后应清理半成品目录
           expect(
