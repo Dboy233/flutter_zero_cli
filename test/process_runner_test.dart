@@ -14,7 +14,7 @@ Future<String> _capture(
   final file = File(
     p.join(
       Directory.systemTemp.path,
-      'fluzer_cap_${DateTime.now().microsecondsSinceEpoch}.log',
+      'fluzer_cap_${pid}_${DateTime.now().microsecondsSinceEpoch}.log',
     ),
   );
   final sink = file.openWrite();
@@ -34,7 +34,7 @@ Future<File> _writeScript(String source) async {
   final file = File(
     p.join(
       Directory.systemTemp.path,
-      'fluzer_script_${DateTime.now().microsecondsSinceEpoch}.dart',
+      'fluzer_script_${pid}_${DateTime.now().microsecondsSinceEpoch}.dart',
     ),
   );
   await file.writeAsString(source);
@@ -42,10 +42,16 @@ Future<File> _writeScript(String source) async {
 }
 
 void main() {
+  late ProcessRunner runner;
+
+  setUp(() {
+    runner = ProcessRunner();
+  });
+
   group('ProcessRunner.run 输出策略（显示 / 隐藏）', () {
     test('showLive:true —— 实时透传子进程输出到 sink', () async {
       final content = await _capture(
-        (out, err) => ProcessRunner.run(
+        (out, err) => runner.run(
           Platform.resolvedExecutable,
           ['--version'],
           showLive: true,
@@ -58,7 +64,7 @@ void main() {
 
     test('showLive:false —— 子进程输出完全隐藏（不打印）', () async {
       final content = await _capture(
-        (out, err) => ProcessRunner.run(
+        (out, err) => runner.run(
           Platform.resolvedExecutable,
           ['--version'],
           showLive: false,
@@ -79,7 +85,7 @@ void main() {
         '}',
       );
       final content = await _capture(
-        (out, err) => ProcessRunner.run(
+        (out, err) => runner.run(
           Platform.resolvedExecutable,
           ['run', script.path],
           showLive: false,
@@ -101,7 +107,7 @@ void main() {
         '}',
       );
       final content = await _capture(
-        (out, err) => ProcessRunner.run(
+        (out, err) => runner.run(
           Platform.resolvedExecutable,
           ['run', script.path],
           showLive: true,
@@ -115,11 +121,77 @@ void main() {
     });
 
     test('非零退出码如实返回', () async {
-      final code = await ProcessRunner.run(Platform.resolvedExecutable, [
+      final code = await runner.run(Platform.resolvedExecutable, [
         'run',
         'this_package_does_not_exist_xyz',
       ], showLive: false);
       expect(code, isNonZero);
+    });
+  });
+
+  group('ProcessRunner 依赖注入（impl）', () {
+    // 注入 impl 是本次重构的核心（消灭全局可变 runOverride）：
+    // 构造时传入 ProcessRunFn，run 必须直接调用它、不启动真实进程，
+    // 且把 executable / args / showLive / workingDirectory 原样透传。
+    test('注入 impl 时直接调用它而非启动真实进程', () async {
+      var called = false;
+      String? capturedExecutable;
+      List<String>? capturedArgs;
+      bool? capturedShowLive;
+      String? capturedWorkingDirectory;
+
+      final injected = ProcessRunner(
+        impl: (executable, args, {workingDirectory, bool showLive = false}) async {
+          called = true;
+          capturedExecutable = executable;
+          capturedArgs = args;
+          capturedShowLive = showLive;
+          capturedWorkingDirectory = workingDirectory;
+          return 42;
+        },
+      );
+
+      final code = await injected.run(
+        'dart',
+        ['--version'],
+        showLive: true,
+        workingDirectory: '/tmp/x',
+      );
+
+      expect(code, 42);
+      expect(called, isTrue);
+      expect(capturedExecutable, 'dart');
+      expect(capturedArgs, ['--version']);
+      expect(capturedShowLive, isTrue);
+      expect(capturedWorkingDirectory, '/tmp/x');
+    });
+
+    test('impl 接收 showLive 的默认值（false）', () async {
+      var capturedShowLive = true;
+      final injected = ProcessRunner(
+        impl: (_, args, {workingDirectory, bool showLive = false}) async {
+          capturedShowLive = showLive;
+          return 0;
+        },
+      );
+
+      await injected.run('dart', ['--version']);
+
+      expect(capturedShowLive, isFalse);
+    });
+
+    test('impl 存在时即使 showLive:true 也不触碰真实进程', () async {
+      // 若 showLive 路径错误地把调用落回真实进程，dart --version 会成功返回 0；
+      // 这里用 impl 固定返回 7，验证全程走注入实现。
+      final injected = ProcessRunner(
+        impl: (_, args, {workingDirectory, bool showLive = false}) async => 7,
+      );
+      final code = await injected.run(
+        Platform.resolvedExecutable,
+        ['--version'],
+        showLive: true,
+      );
+      expect(code, 7);
     });
   });
 }

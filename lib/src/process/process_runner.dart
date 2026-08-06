@@ -9,8 +9,7 @@
 // - [showLive] 为 false（默认，无 --log）：子进程输出完全隐藏——仅缓冲于
 //   内存并丢弃，不打印到控制台（重定向到文件 / CI 场景同样不输出）。
 //
-// 命令层通过默认实现统一走 [ProcessRunner.run]；[runOverride] 仅供测试替换
-// 实现（拦截 [showLive] 等行为，避免真正拉起子进程）。
+// 测试可构造实例并注入 mock 实现（参见 [ProcessRunFn]），无需全局可变状态。
 
 import 'dart:async';
 import 'dart:io';
@@ -33,21 +32,18 @@ typedef ProcessRunFn =
 /// 外部进程执行器。
 ///
 /// 统一负责：启动进程、按策略转发 stdout / stderr、返回退出码。
+/// 实例化后通过 [run] 调用；测试可注入 [ProcessRunFn] 实现。
 ///
 /// External process executor: starts the process, forwards stdout / stderr
-/// according to the policy, and returns the exit code.
+/// according to the policy, and returns the exit code. Instantiate and call
+/// [run]; tests can inject a [ProcessRunFn] implementation.
 class ProcessRunner {
-  const ProcessRunner._();
+  /// 创建执行器。[_impl] 用于注入测试实现；生产代码省略即可。
+  ///
+  /// Creates a runner. [_impl] injects a test double; leave null in production.
+  ProcessRunner({this._impl});
 
-  /// 测试可替换的 [run] 实现；生产代码保持 `null`。
-  ///
-  /// 设为非 null 时，[run] 会直接委托给它（参数原样转发），
-  /// 既不真正启动子进程，也不触碰 stdout / stderr，便于在测试中拦截
-  /// [showLive] 等可见性决策。
-  ///
-  /// Test-only override for [run]. When non-null, [run] delegates to it
-  /// without spawning a real process.
-  static ProcessRunFn? runOverride;
+  final ProcessRunFn? _impl;
 
   /// 在 [workingDirectory] 下执行 [executable]（参数 [args]），返回退出码。
   ///
@@ -59,7 +55,7 @@ class ProcessRunner {
   ///
   /// Runs [executable] with [args] under [workingDirectory] and returns the
   /// exit code. See file header for the output policy.
-  static Future<int> run(
+  Future<int> run(
     String executable,
     List<String> args, {
     String? workingDirectory,
@@ -67,9 +63,9 @@ class ProcessRunner {
     IOSink? stdoutSink,
     IOSink? stderrSink,
   }) async {
-    // 测试钩子：直接委托，不启动真实子进程。
-    if (runOverride != null) {
-      return runOverride!(
+    final impl = _impl;
+    if (impl != null) {
+      return impl(
         executable,
         args,
         workingDirectory: workingDirectory,
@@ -81,22 +77,19 @@ class ProcessRunner {
     final errSink = stderrSink ?? stderr;
 
     if (showLive) {
-      // 实时（显示）模式：把子进程输出直接透传到终端（--log 调试）。
       return _runLive(executable, args, workingDirectory, outSink, errSink);
     } else {
-      // 非实时（隐藏）模式：缓冲子进程输出并丢弃，不打印到控制台。
       return _runHidden(executable, args, workingDirectory: workingDirectory);
     }
   }
 
-  static Future<int> _runLive(
+  Future<int> _runLive(
     String executable,
     List<String> args,
     String? workingDirectory,
     IOSink outSink,
     IOSink errSink,
   ) async {
-    // 实时（显示）模式：把子进程输出直接透传到终端（--log 调试）。
     final process = await Process.start(
       executable,
       args,
@@ -119,7 +112,7 @@ class ProcessRunner {
   ///
   /// 子进程输出不打印到控制台（无 --log 时用户无需看到），仅缓冲于内存后
   /// 丢弃——避免污染 fluzer 自身的步骤日志。重定向到文件 / CI 场景同样隐藏。
-  static Future<int> _runHidden(
+  Future<int> _runHidden(
     String executable,
     List<String> args, {
     String? workingDirectory,

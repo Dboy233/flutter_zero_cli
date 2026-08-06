@@ -37,10 +37,14 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
     FlutterGenL10nRunner? flutterGenL10nFn,
     this.workingDirectory,
     VersionCheckService? versionCheckService,
+    ProcessRunner? processRunner,
+    ToastHandlePatcher? patcher,
   }) : _logger = logger ?? Logger(),
        _versionCheckService =
            versionCheckService ??
-           VersionCheckService(logger: logger ?? Logger()) {
+           VersionCheckService(logger: logger ?? Logger()),
+       _processRunner = processRunner ?? ProcessRunner(),
+       _patcher = patcher ?? const ToastHandlePatcher() {
     _flutterGenL10n = flutterGenL10nFn ?? _defaultFlutterGenL10n;
     argParser
       ..addFlag(
@@ -73,6 +77,10 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
   /// Injected version-check service (for tests); creates a default instance
   /// when omitted.
   final VersionCheckService _versionCheckService;
+
+  final ProcessRunner _processRunner;
+
+  final ToastHandlePatcher _patcher;
 
   @override
   Logger get logger => _logger;
@@ -325,7 +333,7 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
       );
     }
 
-    final outcome = await patchDefaultToastHandle(handleFile, force: force);
+    final outcome = await _patcher.patch(handleFile, force: force);
     if (outcome.result == ToastHandlePatchResult.patched) {
       // 补齐 import（幂等），随后 dart_style 库内统一格式化
       final mod = CodeMod(handleFile, format: false);
@@ -333,7 +341,7 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
       await mod.addImport(
         'package:$packageName/l10n/gen/l10n_toast_effect_helper.dart',
       );
-      await formatDartFile(handleFile);
+      await _patcher.format(handleFile);
     }
     return outcome;
   }
@@ -400,7 +408,7 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
   }
 
   Future<int> _defaultFlutterGenL10n(String projectRoot) {
-    return ProcessRunner.run(
+    return _processRunner.run(
       'flutter',
       ['gen-l10n'],
       workingDirectory: projectRoot,

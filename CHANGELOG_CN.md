@@ -4,6 +4,11 @@
 
 - `create`、`new`、`gen-l10n` 现在启动时会静默检查版本更新（通过新增的 `VersionCheckMixin`）：缓存命中且存在更新时瞬时提示一行升级信息；否则仅在缓存过期时才用 spinner 包裹一次网络检查。无更新或网络不可达均静默降级，不阻断命令主流程。
 - `version` 命令现在将网络版本检查包裹在 `runWithSpinner` 中，显示实时「正在检查更新…」进度提示，不再静默阻塞。
+- `new` 命令现在向 `build_runner build` 传入 `--build-filter lib/features/<feature>/**.dart`，代码生成仅针对新生成的模块目录执行，而非整个工程，大型项目下显著更快。
+- 移除了全局可变的 `ProcessRunner.runOverride` 测试钩子；`ProcessRunner` 改为实例化并通过构造注入 `ProcessRunFn` 实现，消除测试间的全局状态污染。
+- `gen-l10n` 的 AST 接线与 Dart 格式化逻辑收拢进 `ToastHandlePatcher` 类（取代原先的顶层函数），提升内聚性。
+- 版本号解析从 `RegularUtils` 改为 `VersionExtractor` 类。
+- `create`、`new`、`gen-l10n` 命令现通过构造注入 `ProcessRunner`（其中 `gen-l10n` 还注入 `ToastHandlePatcher`），取代原先的静态访问，完成本轮依赖注入改造。
 
 ## 1.1.2
 

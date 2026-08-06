@@ -6,26 +6,15 @@ import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 /// 验证全局 `--log` 开关经 [Fluzer] 注入子命令，使 [ProcessRunner.run]
-/// 收到正确的 [ProcessRunner.run] showLive（是否实时显示子进程输出）。
+/// 收到正确的 showLive（是否实时显示子进程输出）。
 ///
-/// 这正是此前被忽略的 bug：子命令的 `argResults` 不含全局 `--log`，
-/// 导致 `--log` 对子命令永远无效、子进程输出未被显示。
+/// 通过构造注入 mock [ProcessRunner] 拦截调用，不再使用全局可变静态变量。
 void main() {
   group('Fluzer --log 传播到子命令 ProcessRunner.showLive', () {
     late Directory tempDir;
     bool? capturedShowLive;
 
     setUp(() async {
-      // 拦截 ProcessRunner.run，记录 showLive 且不真正拉起子进程。
-      ProcessRunner.runOverride = (
-        String executable,
-        List<String> args, {
-        String? workingDirectory,
-        bool showLive = false,
-      }) {
-        capturedShowLive = showLive;
-        return Future.value(0);
-      };
       capturedShowLive = null;
 
       // 搭建最小 flutter_zero 工程，使 gen-l10n 能走到 flutter gen-l10n 步骤。
@@ -60,7 +49,6 @@ void main() {
     });
 
     tearDown(() async {
-      ProcessRunner.runOverride = null;
       // Windows 下新建的 .dart 文件可能被杀毒软件短暂锁定，删除失败属常态；
       // 重试几次，仍失败则交予系统临时目录清理，避免误判测试失败。
       for (var i = 0; i < 3; i++) {
@@ -73,10 +61,24 @@ void main() {
       }
     });
 
+    /// 创建 mock [ProcessRunner] 拦截 showLive 并记录，将其注入 [Fluzer]。
+    Fluzer createFluzer() {
+      final mockRunner = ProcessRunner(
+        impl: (
+          String executable,
+          List<String> args, {
+          String? workingDirectory,
+          bool showLive = false,
+        }) {
+          capturedShowLive = showLive;
+          return Future.value(0);
+        },
+      );
+      return Fluzer(workingDirectory: tempDir, processRunner: mockRunner);
+    }
+
     Future<void> runInProject(List<String> args) async {
-      // 通过 Fluzer(workingDirectory:) 注入临时工程目录，避免修改全局
-      // Directory.current（进程级状态，dart test 并行下会跨测试互相踩踏）。
-      await Fluzer(workingDirectory: tempDir).run(args);
+      await createFluzer().run(args);
     }
 
     test('--log 时 gen-l10n 的 showLive 为 true（显示子进程输出）', () async {

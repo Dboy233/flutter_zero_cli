@@ -4,6 +4,11 @@
 
 - `create`, `new` and `gen-l10n` now perform a silent version-update check at startup (via the new `VersionCheckMixin`): a cached hit with an available update shows a one-line hint instantly, otherwise the check runs behind a spinner only when the cache is stale. No update or unreachable network degrades silently without blocking the command.
 - The `version` command now wraps its network update check in `runWithSpinner`, giving a live "checking for updates…" progress indication instead of blocking silently.
+- The `new` command now passes `--build-filter lib/features/<feature>/**.dart` to `build_runner build`, so code generation runs only for the newly scaffolded module instead of the whole project — significantly faster on large codebases.
+- Removed the global mutable `ProcessRunner.runOverride` test hook; `ProcessRunner` is now instantiated and accepts an injected `ProcessRunFn` implementation, eliminating cross-test global state.
+- `gen-l10n` AST patching and Dart formatting were moved into a `ToastHandlePatcher` class (replacing the previous top-level functions) for better cohesion.
+- `RegularUtils` was replaced by a `VersionExtractor` class for URL version parsing.
+- `create`, `new` and `gen-l10n` commands now receive `ProcessRunner` (and `gen-l10n` additionally `ToastHandlePatcher`) via constructor injection instead of static access, completing the dependency-injection pass.
 
 ## 1.1.2
 

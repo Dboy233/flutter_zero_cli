@@ -431,7 +431,7 @@ void main() {
             flutterCreate: (_, {String? projectName, String? org}) async => 0,
             flutterPubGet: (_) async => 0,
             flutterGenL10n: (_) async => 0,
-            buildRunner: (_) async => 0,
+            buildRunner: (_, {String? buildFilter}) async => 0,
           );
           final code = await runnerWith(cmd)
               .run(['create', 'my_app', '--no-build-runner']);
@@ -455,7 +455,7 @@ void main() {
             flutterCreate: (_, {String? projectName, String? org}) async => 1,
             flutterPubGet: (_) async => 0,
             flutterGenL10n: (_) async => 0,
-            buildRunner: (_) async => 0,
+            buildRunner: (_, {String? buildFilter}) async => 0,
           );
           final code = await runnerWith(cmd)
               .run(['create', 'fail_app', '--no-build-runner']);
@@ -505,7 +505,7 @@ void main() {
             versionCheckService: _noopVersionCheckService,
             loader: LocalBrickLoader(bricksRoot),
             workingDirectory: projectDir,
-            buildRunner: (_) async => 0,
+            buildRunner: (_, {String? buildFilter}) async => 0,
           );
           final code = await runnerWith(cmd).run(['new', 'user_profile']);
           expect(code, 0);
@@ -532,6 +532,29 @@ void main() {
           );
           final content = await injection.readAsString();
           expect(content, contains('UserProfileModule.register(getIt);'));
+        },
+      );
+
+      test(
+        '完整流程 build_runner 收到正确的 --build-filter / '
+        'build_runner receives correct --build-filter',
+        () async {
+          String? receivedFilter;
+          final cmd = NewCommand(
+            versionCheckService: _noopVersionCheckService,
+            loader: LocalBrickLoader(bricksRoot),
+            workingDirectory: projectDir,
+            buildRunner: (_, {String? buildFilter}) async {
+              receivedFilter = buildFilter;
+              return 0;
+            },
+          );
+          await runnerWith(cmd).run(['new', 'user_profile']);
+
+          expect(
+            receivedFilter,
+            'lib/features/user_profile/**.dart',
+          );
         },
       );
     });

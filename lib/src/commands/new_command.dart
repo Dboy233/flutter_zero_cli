@@ -17,7 +17,8 @@ import '../version/version_check_mixin.dart';
 /// build_runner 执行器签名。
 ///
 /// Signature for the build_runner executor.
-typedef BuildRunnerRunner = Future<int> Function(String projectRoot);
+typedef BuildRunnerRunner =
+    Future<int> Function(String projectRoot, {String? buildFilter});
 
 /// `new` 命令：在当前 flutter_zero 模板项目中生成功能模块。
 ///
@@ -45,10 +46,14 @@ class NewCommand extends Command<int> with VersionCheckMixin {
     BuildRunnerRunner? buildRunner,
     this.workingDirectory,
     VersionCheckService? versionCheckService,
+    ProcessRunner? processRunner,
   }) : _logger = logger ?? Logger(),
        // ignore: prefer_initializing_formals
        _loader = loader,
-       _versionCheckService = versionCheckService ?? VersionCheckService(logger: logger ?? Logger()) {
+       _versionCheckService =
+           versionCheckService ??
+           VersionCheckService(logger: logger ?? Logger()),
+       _processRunner = processRunner ?? ProcessRunner() {
     _buildRunner = buildRunner ?? _defaultBuildRunner;
     argParser
       ..addFlag(
@@ -76,6 +81,8 @@ class NewCommand extends Command<int> with VersionCheckMixin {
   /// Injected version-check service (for tests); creates a default instance
   /// when omitted.
   final VersionCheckService _versionCheckService;
+
+  final ProcessRunner _processRunner;
 
   @override
   Logger get logger => _logger;
@@ -149,9 +156,11 @@ class NewCommand extends Command<int> with VersionCheckMixin {
         message: '步骤 2/4：解析模板加载器（本地或远程下载）...',
         work: () async {
           _logger.detail('  按项目模板版本 ${config.version} 钉死下载源');
-          brickLoader = _loader ??
-              await TemplateSourceResolver(logger: _logger)
-                  .resolve(pinnedVersion: config.version);
+          brickLoader =
+              _loader ??
+              await TemplateSourceResolver(
+                logger: _logger,
+              ).resolve(pinnedVersion: config.version);
         },
       );
 
@@ -178,7 +187,10 @@ class NewCommand extends Command<int> with VersionCheckMixin {
         final exitCode = await runWithSpinner(
           logger: _logger,
           message: '步骤 4/4：运行 build_runner ...',
-          work: () => _buildRunner(config.projectRoot),
+          work: () => _buildRunner(
+            config.projectRoot,
+            buildFilter: 'lib/features/$featureName/**.dart',
+          ),
         );
         if (exitCode != 0) {
           _logger.err('build_runner 执行失败。\nbuild_runner failed.');
@@ -203,10 +215,17 @@ class NewCommand extends Command<int> with VersionCheckMixin {
     }
   }
 
-  Future<int> _defaultBuildRunner(String projectRoot) {
-    return ProcessRunner.run(
+  Future<int> _defaultBuildRunner(
+    String projectRoot, {
+    String? buildFilter,
+  }) async {
+    final args = ['run', 'build_runner', 'build'];
+    if (buildFilter != null) {
+      args.addAll(['--build-filter', buildFilter]);
+    }
+    return _processRunner.run(
       'dart',
-      ['run', 'build_runner', 'build'],
+      args,
       workingDirectory: projectRoot,
       showLive: _logger.level == Level.verbose,
     );

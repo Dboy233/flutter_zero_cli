@@ -13,6 +13,7 @@ import 'commands/create_command.dart';
 import 'commands/gen_l10n_command.dart';
 import 'commands/new_command.dart';
 import 'commands/version_command.dart';
+import 'process/process_runner.dart';
 
 /// CLI 主类，注册并分发命令 / Main CLI class, registers and dispatches commands
 class Fluzer {
@@ -24,7 +25,7 @@ class Fluzer {
   /// [workingDirectory] pins the working directory commands run in (start dir
   /// for walking up to the project config); defaults to the current directory.
   /// Tests inject a temp dir so they never mutate the global cwd.
-  const Fluzer({this.workingDirectory});
+  const Fluzer({this.workingDirectory, this.processRunner});
 
   /// 命令运行的工作目录（向上查找项目配置的起点）。
   /// 省略时回退到当前工作目录。
@@ -32,6 +33,11 @@ class Fluzer {
   /// Working directory commands run in (start dir for walking up to the project
   /// config). Defaults to the current directory.
   final Directory? workingDirectory;
+
+  /// 进程执行器（测试注入 mock）；省略时使用默认实现。
+  ///
+  /// Process runner (test injects a mock); defaults to real implementation.
+  final ProcessRunner? processRunner;
 
   /// 运行 CLI / Runs the CLI
   Future<int> run(List<String> arguments) async {
@@ -43,6 +49,8 @@ class Fluzer {
     // 子进程原始输出与异常堆栈）；否则默认 info。可见性全部由 logger.level 驱动，
     // 不再需要额外的策略对象。
     final logger = Logger(level: debug ? Level.verbose : Level.info);
+
+    final pr = processRunner ?? ProcessRunner();
 
     final runner =
         CommandRunner<int>(
@@ -57,9 +65,9 @@ class Fluzer {
             help: '调试模式：显示详细日志、子进程原始输出与异常堆栈 / '
                 'Debug mode: verbose logs, raw subprocess output and stack traces',
           )
-          ..addCommand(CreateCommand(logger: logger, workingDirectory: workingDirectory))
-          ..addCommand(NewCommand(logger: logger, workingDirectory: workingDirectory))
-          ..addCommand(GenL10nCommand(logger: logger, workingDirectory: workingDirectory))
+          ..addCommand(CreateCommand(logger: logger, workingDirectory: workingDirectory, processRunner: pr))
+          ..addCommand(NewCommand(logger: logger, workingDirectory: workingDirectory, processRunner: pr))
+          ..addCommand(GenL10nCommand(logger: logger, workingDirectory: workingDirectory, processRunner: pr))
           ..addCommand(VersionCommand(logger: logger))
           ..addCommand(CacheCommand(logger: logger));
 

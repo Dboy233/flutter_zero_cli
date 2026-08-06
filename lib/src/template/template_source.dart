@@ -73,7 +73,7 @@ class TemplateSourceResolver {
       _logger.detail('FLUZER_TEMPLATE_ZIP_URL = $overrideUrl');
       return RemoteBrickLoader(
         zipUrl: overrideUrl,
-        templateVersion: RegularUtils.extractVersion(overrideUrl),
+        templateVersion: VersionExtractor.extractVersion(overrideUrl),
         httpClient: _httpClient,
       );
     }
@@ -101,7 +101,7 @@ class TemplateSourceResolver {
       if (body == null) {
         return (
           url: defaultTemplateZipUrl,
-          version: RegularUtils.extractVersion(defaultTemplateZipUrl),
+          version: VersionExtractor.extractVersion(defaultTemplateZipUrl),
         );
       }
 

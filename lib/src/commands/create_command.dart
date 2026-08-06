@@ -78,10 +78,14 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
     CreateBuildRunnerRunner? buildRunner,
     this.workingDirectory,
     VersionCheckService? versionCheckService,
+    ProcessRunner? processRunner,
   }) : _logger = logger ?? Logger(),
        // ignore: prefer_initializing_formals
        _loader = loader,
-       _versionCheckService = versionCheckService ?? VersionCheckService(logger: logger ?? Logger()) {
+       _versionCheckService =
+           versionCheckService ??
+           VersionCheckService(logger: logger ?? Logger()),
+       _processRunner = processRunner ?? ProcessRunner() {
     _flutterCreate = flutterCreate ?? _defaultFlutterCreate;
     _flutterPubGet = flutterPubGet ?? _defaultFlutterPubGet;
     _flutterGenL10n = flutterGenL10n ?? _defaultFlutterGenL10n;
@@ -107,6 +111,8 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
   /// Injected version-check service (for tests); creates a default instance
   /// when omitted.
   final VersionCheckService _versionCheckService;
+
+  final ProcessRunner _processRunner;
 
   @override
   Logger get logger => _logger;
@@ -199,7 +205,8 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
         work: () async {
           // 直接渲染到当前目录：brick 的 {{name}} 层展开后即为 targetDir
           final brickLoader =
-              _loader ?? await TemplateSourceResolver(logger: _logger).resolve();
+              _loader ??
+              await TemplateSourceResolver(logger: _logger).resolve();
           final renderer = BrickRenderer(brickLoader);
           await renderer.generate(
             brickName: 'project',
@@ -375,7 +382,7 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
     if (org != null) {
       args.addAll(['--org', org]);
     }
-    return ProcessRunner.run(
+    return _processRunner.run(
       'flutter',
       args,
       workingDirectory: projectRoot,
@@ -385,7 +392,7 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
 
   /// 默认的 flutter pub get 执行器 / Default flutter pub get runner
   Future<int> _defaultFlutterPubGet(String projectRoot) {
-    return ProcessRunner.run(
+    return _processRunner.run(
       'flutter',
       ['pub', 'get'],
       workingDirectory: projectRoot,
@@ -395,7 +402,7 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
 
   /// 默认的 flutter gen-l10n 执行器 / Default flutter gen-l10n runner
   Future<int> _defaultFlutterGenL10n(String projectRoot) {
-    return ProcessRunner.run(
+    return _processRunner.run(
       'flutter',
       ['gen-l10n'],
       workingDirectory: projectRoot,
@@ -405,7 +412,7 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
 
   /// 默认的 build_runner 执行器 / Default build_runner runner
   Future<int> _defaultBuildRunner(String projectRoot) {
-    return ProcessRunner.run(
+    return _processRunner.run(
       'dart',
       ['run', 'build_runner', 'build'],
       workingDirectory: projectRoot,
