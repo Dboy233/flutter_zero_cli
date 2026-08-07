@@ -10,6 +10,8 @@
 
 import 'dart:io';
 
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
+
 import 'codemod_file_editor.dart';
 import 'insert_at_method_end_transform.dart';
 import 'ordered_import_transform.dart';
@@ -36,12 +38,18 @@ class CodeMod {
   ///
   /// Creates the utility. [file] is the target Dart file; [format] toggles
   /// post-write `dart format`.
-  const CodeMod(this.file, {this.format = true});
+  CodeMod(this.file, {this.format = true, Translations? messages})
+    : _messages = messages ?? AppLocale.zh.buildSync();
 
   /// 目标 Dart 文件。
   ///
   /// Target Dart file.
   final File file;
+
+  /// 本地化消息（类型安全访问器）。
+  ///
+  /// Localized messages (type-safe accessors).
+  final Translations _messages;
 
   /// 是否在写入后自动格式化。
   ///
@@ -53,7 +61,7 @@ class CodeMod {
   /// One-call import insertion (sorted per directives_ordering; skips if
   /// the import already exists).
   Future<void> addImport(String uri) async {
-    await CodemodFileEditor(file, format: format).apply([
+    await CodemodFileEditor(file, format: format, messages: _messages).apply([
       OrderedImportTransform(uri),
     ]);
   }
@@ -68,7 +76,7 @@ class CodeMod {
     required String code,
     String? skipIfContains,
   }) async {
-    await CodemodFileEditor(file, format: format).apply([
+    await CodemodFileEditor(file, format: format, messages: _messages).apply([
       InsertAtMethodEndTransform(
         className: className,
         methodName: methodName,

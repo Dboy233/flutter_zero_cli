@@ -8,6 +8,7 @@
 // 故要求命令通过公开 getter 暴露 [logger] 与 [versionCheckService]。
 
 import 'package:args/command_runner.dart';
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:mason_logger/mason_logger.dart';
 
 import '../logging/spinner.dart';
@@ -27,6 +28,11 @@ mixin VersionCheckMixin on Command<int> {
   /// The version-check service the command must expose.
   VersionCheckService get versionCheckService;
 
+  /// 命令必须暴露的本地化消息（命令内部用私有 `_messages` 实现即可）。
+  ///
+  /// The localized messages the command must expose.
+  Translations get messages;
+
   /// 在命令主体执行前调用，确保用户获知可能的版本更新。
   ///
   /// - 缓存命中且存在更新：瞬时提示（无 spinner，不打扰主流程）；
@@ -39,12 +45,9 @@ mixin VersionCheckMixin on Command<int> {
     final cached = versionCheckService.peekCachedUpdate();
     if (cached != null) {
       if (cached.hasUpdate) {
-        logger.info(
-          '发现新版本 ${cached.latest}，运行 '
-          '`dart pub global activate fluzer` 升级',
-        );
+        logger.info(messages.version.updateHint(latest: cached.latest));
       } else {
-        logger.detail('(cache)已是最新版本.');
+        logger.detail(messages.versionCheck.cacheLatest);
       }
       return;
     }
@@ -53,16 +56,14 @@ mixin VersionCheckMixin on Command<int> {
     // 控制不显示 spinner，直接执行）；结果打印在 work 闭包外，避免破坏动画行。
     final result = await runWithSpinner<VersionCheckResult>(
       logger: logger,
-      message: '正在检查更新…',
+      messages: messages,
+      message: messages.version.checking,
       work: () => versionCheckService.checkForUpdate(),
     );
     if (result.hasUpdate) {
-      logger.info(
-        '发现新版本 ${result.latest}，运行 '
-        '`dart pub global activate fluzer` 升级',
-      );
+      logger.info(messages.version.updateHint(latest: result.latest));
     } else {
-      logger.detail('(pub.dev)已是最新版本.');
+      logger.detail(messages.versionCheck.pubdevLatest);
     }
   }
 }

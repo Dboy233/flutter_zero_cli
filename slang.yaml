@@ -1,0 +1,6 @@
+# slang 配置（纯 Dart CLI，不依赖 Flutter）
+# slang 读取 input_directory 下的 <locale>.i18n.json，生成类型安全的访问器。
+base_locale: zh
+input_directory: lib/src/i18n/resources
+output_directory: lib/src/i18n/gen
+flutter_integration: false

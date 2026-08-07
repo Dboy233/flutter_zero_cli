@@ -5,6 +5,7 @@
 // - 非交互终端（测试环境无 TTY）：同样直接执行 work，安全降级；
 // - work 抛异常时向上传播，不吞掉错误。
 
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:fluzer/src/logging/spinner.dart';
 import 'package:mason_logger/mason_logger.dart';
 import 'package:test/test.dart';
@@ -16,6 +17,7 @@ void main() {
       final result = await runWithSpinner(
         logger: Logger(level: Level.verbose),
         message: '步骤 X ...',
+        messages: AppLocale.zh.buildSync(),
         work: () async {
           called = true;
           return 42;
@@ -32,6 +34,7 @@ void main() {
       final result = await runWithSpinner(
         logger: Logger(level: Level.info),
         message: '步骤 X ...',
+        messages: AppLocale.zh.buildSync(),
         work: () async {
           called = true;
           return 'ok';
@@ -46,6 +49,7 @@ void main() {
         () => runWithSpinner(
           logger: Logger(level: Level.verbose),
           message: '步骤 X ...',
+        messages: AppLocale.zh.buildSync(),
           work: () async => throw const FormatException('boom'),
         ),
         throwsA(isA<FormatException>()),

@@ -8,6 +8,7 @@
 import 'dart:io';
 
 import 'package:archive/archive.dart';
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:mason/mason.dart';
 import 'package:path/path.dart' as p;
 
@@ -36,18 +37,24 @@ class LocalBrickLoader extends BrickLoader {
   /// 创建本地加载器。
   ///
   /// Creates a local loader.
-  LocalBrickLoader(this.bricksRoot);
+  LocalBrickLoader(this.bricksRoot, {Translations? messages})
+    : _messages = messages ?? AppLocale.zh.buildSync();
 
   /// 各 brick 子目录的根目录。
   ///
   /// Root directory containing one subdirectory per brick.
   final Directory bricksRoot;
 
+  /// 本地化消息（类型安全访问器）。
+  ///
+  /// Localized messages (type-safe accessors).
+  final Translations _messages;
+
   @override
   Future<Brick> load(String brickName) async {
     final dir = Directory(p.normalize(p.join(bricksRoot.path, brickName)));
     if (!dir.existsSync()) {
-      throw CliException('本地模板不存在：\nLocal template not found: ${dir.path}');
+      throw CliException(_messages.template.localTemplateNotFound(path: dir.path));
     }
     return Brick.path(dir.path);
   }
@@ -80,7 +87,9 @@ class RemoteBrickLoader extends BrickLoader {
     FluzerHttpClient? httpClient,
     Directory? cacheDir,
     Logger? logger,
+    Translations? messages,
   }) : httpClient = httpClient ?? FluzerHttpClient(),
+       _messages = messages ?? AppLocale.zh.buildSync(),
        cacheDir =
            cacheDir ??
            Directory(p.join(Directory.systemTemp.path, cacheDirName)),
@@ -117,14 +126,18 @@ class RemoteBrickLoader extends BrickLoader {
   /// log
   final Logger logger;
 
+  /// 本地化消息（类型安全访问器）。
+  ///
+  /// Localized messages (type-safe accessors).
+  final Translations _messages;
+
   @override
   Future<Brick> load(String brickName) async {
     final bricksRoot = await _resolveBricksRoot();
     final dir = Directory(p.join(bricksRoot.path, brickName));
     if (!dir.existsSync()) {
       throw CliException(
-        '远程模板中未找到 brick：$brickName\n'
-        'Brick not found in remote templates: $brickName',
+        _messages.template.remoteBrickNotFound(brickName: brickName),
       );
     }
     return Brick.path(dir.path);
@@ -138,16 +151,13 @@ class RemoteBrickLoader extends BrickLoader {
     final extractDir = Directory(p.join(cacheDir.path, cacheKey));
     if (extractDir.existsSync()) {
       final cacheBricksDir = _findBricksDir(extractDir);
-      logger.detail('使用缓存模板/Use caching templates:$cacheBricksDir');
+      logger.detail(_messages.template.usingCachedDetail(path: cacheBricksDir.path));
       return cacheBricksDir;
     }
 
     final downloaded = await httpClient.downloadFile(zipUrl);
     if (downloaded == null) {
-      throw CliException(
-        '模板下载失败（直连与镜像均不可达）：\n'
-        'Failed to download templates: $zipUrl',
-      );
+      throw CliException(_messages.template.downloadFailed(url: zipUrl));
     }
     try {
       final bytes = await downloaded.file.readAsBytes();
@@ -157,8 +167,7 @@ class RemoteBrickLoader extends BrickLoader {
         // 防御 Zip Slip：拒绝逃逸出解压目录的条目。
         if (!p.isWithin(extractDir.path, filePath)) {
           throw CliException(
-            '模板 zip 包含非法路径：${file.name}\n'
-            'Template zip contains an illegal path: ${file.name}',
+            _messages.template.zipIllegalPath(name: file.name),
           );
         }
         if (file.isFile) {
@@ -187,9 +196,6 @@ class RemoteBrickLoader extends BrickLoader {
         return entity;
       }
     }
-    throw CliException(
-      '远程模板中未找到 bricks 目录。\n'
-      'No "bricks" directory found in remote templates.',
-    );
+    throw CliException(_messages.template.bricksDirNotFound);
   }
 }

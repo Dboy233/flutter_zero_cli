@@ -3,6 +3,7 @@
 // `version` command: prints the current version and checks pub.dev for updates.
 
 import 'package:args/command_runner.dart';
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:mason_logger/mason_logger.dart';
 
 import '../config/template_config.dart';
@@ -24,19 +25,21 @@ class VersionCommand extends Command<int> {
   VersionCommand({
     Logger? logger,
     VersionCheckService? versionCheckService,
+    Translations? messages,
   })  : _logger = logger ?? Logger(),
+        _messages = messages ?? AppLocale.zh.buildSync(),
         _versionCheckService =
             versionCheckService ?? VersionCheckService(logger: logger ?? Logger());
 
   final Logger _logger;
+  final Translations _messages;
   final VersionCheckService _versionCheckService;
 
   @override
   String get name => 'version';
 
   @override
-  String get description =>
-      '查看当前版本并检查更新 / Show version and check for updates';
+  String get description => _messages.version.description;
 
   @override
   Future<int> run() async {
@@ -46,20 +49,21 @@ class VersionCommand extends Command<int> {
     // --log 模式下 runWithSpinner 不显示 spinner，改为直接执行。
     final result = await runWithSpinner<VersionCheckResult>(
       logger: _logger,
-      message: '正在检查更新…',
+      messages: _messages,
+      message: _messages.version.checking,
       work: () => _versionCheckService.checkForUpdate(),
     );
 
     if (!result.available) {
-      _logger.info('（无法检查更新：包尚未发布或网络异常）');
+      _logger.info(_messages.version.checkUnavailable);
       return 0;
     }
 
     if (result.hasUpdate) {
-      _logger.info('发现新版本 ${result.latest}，运行以下命令升级：');
+      _logger.info(_messages.version.newVersionFound(latest: result.latest));
       _logger.info('  dart pub global activate fluzer');
     } else {
-      _logger.info('已是最新版本');
+      _logger.info(_messages.version.alreadyLatest);
     }
     return 0;
   }

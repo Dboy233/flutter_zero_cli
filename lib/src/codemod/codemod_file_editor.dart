@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:codemod_recipe/codemod_recipe.dart';
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
 
 /// 对单个 Dart 文件应用 [CodeTransform] 并写回磁盘，可选自动格式化。
 ///
@@ -15,9 +16,15 @@ class CodemodFileEditor {
   /// Creates a file editor for [file].
   /// When [format] is `true` (default), `dart format` is run after patches
   /// are applied.
-  CodemodFileEditor(this._file, {this.format = true});
+  CodemodFileEditor(this._file, {this.format = true, Translations? messages})
+    : _messages = messages ?? AppLocale.zh.buildSync();
 
   final File _file;
+
+  /// 本地化消息（类型安全访问器）。
+  ///
+  /// Localized messages (type-safe accessors).
+  final Translations _messages;
 
   /// 是否在写入后自动格式化文件。
   ///
@@ -58,7 +65,7 @@ class CodemodFileEditor {
       _file.path,
     ], runInShell: true);
     if (result.exitCode != 0) {
-      throw StateError('格式化失败 / Format failed: ${result.stderr}');
+      throw StateError(_messages.codemod.formatFailed(error: result.stderr));
     }
   }
 }

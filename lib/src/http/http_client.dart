@@ -10,6 +10,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:mason_logger/mason_logger.dart';
 
 import '../config/template_config.dart';
@@ -37,14 +38,19 @@ class FluzerHttpClient {
   /// 创建客户端。
   ///
   /// [logger] 用于输出竞速结果提示与下载进度；测试时可注入。[dio] 为统一
-  /// Dio 实例，省略时新建并传递给内部 [RaceHttpClient]。
+  /// Dio 实例，省略时新建并传递给内部 [RaceHttpClient]。[messages] 为本地化
+  /// 消息，省略时回退基础语言。
   ///
   /// Creates the client. [logger] is used for result hints and download
   /// progress; [dio] is the shared Dio instance (a new one is created and
-  /// forwarded to the internal [RaceHttpClient] when omitted).
-  FluzerHttpClient({this._logger, Dio? dio}) : _race = RaceHttpClient(dio: dio);
+  /// forwarded to the internal [RaceHttpClient] when omitted). [messages]
+  /// holds localized strings, falling back to the base locale when omitted.
+  FluzerHttpClient({this._logger, Dio? dio, Translations? messages})
+    : _messages = messages ?? AppLocale.zh.buildSync(),
+      _race = RaceHttpClient(dio: dio);
 
   final Logger? _logger;
+  final Translations _messages;
   final RaceHttpClient _race;
 
   /// 文本 GET（registry 等）整体超时。
@@ -74,11 +80,13 @@ class FluzerHttpClient {
       onFailure: _logFailure,
     );
     if (result == null) {
-      _logger?.err('所有候选地址（直连 + 镜像）请求均失败。');
+      _logger?.err(_messages.http.allRequestsFailed);
       return null;
     }
     _logger?.detail(
-      result.url == url ? '直连请求成功：${result.url}' : '镜像请求成功：${result.url}',
+      result.url == url
+          ? _messages.http.directSuccess(url: result.url)
+          : _messages.http.mirrorSuccess(url: result.url),
     );
     return result.data;
   }
@@ -103,7 +111,7 @@ class FluzerHttpClient {
       final percent = (received / total * 100).floor();
       final filled = (percent / 100 * 40).floor();
       final bar = '${'=' * filled}>${' ' * (40 - filled - 1)}';
-      stdout.write('\r下载模板: [$bar] $percent%');
+      stdout.write('\r${_messages.http.downloadProgress(bar: bar, percent: '$percent')}');
     }
 
     final result = await _race.downloadFileFirst(
@@ -116,11 +124,13 @@ class FluzerHttpClient {
     if (showProgress) stdout.writeln();
 
     if (result == null) {
-      _logger?.err('所有候选地址（直连 + 镜像）下载均失败。');
+      _logger?.err(_messages.http.allDownloadsFailed);
       return null;
     }
     _logger?.detail(
-      result.url == url ? '直连下载成功：${result.url}' : '镜像下载成功：${result.url}',
+      result.url == url
+          ? _messages.http.directDownloadSuccess(url: result.url)
+          : _messages.http.mirrorDownloadSuccess(url: result.url),
     );
     return result.data;
   }
@@ -132,7 +142,7 @@ class FluzerHttpClient {
   /// candidate (Dio cancel) is expected and skipped; other errors warn.
   void _logFailure(String url, Object error) {
     if (error is DioException && error.type == DioExceptionType.cancel) return;
-    _logger?.warn('候选地址请求失败：$url ($error)');
+    _logger?.warn(_messages.http.requestFailed(url: url, error: error));
   }
 
   /// 构建候选地址列表：直连 + 各镜像前缀拼接到原 URL。

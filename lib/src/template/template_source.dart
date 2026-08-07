@@ -19,6 +19,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:fluzer/src/util/regular_utils.dart';
 import 'package:mason_logger/mason_logger.dart';
 
@@ -39,11 +40,16 @@ class TemplateSourceResolver {
   ///
   /// [httpClient] 不传时内部新建（与改造前默认行为一致）；
   /// [logger] 不传时使用默认 [Logger]，仅用于镜像降级 / 下载提示。
-  TemplateSourceResolver({FluzerHttpClient? httpClient, Logger? logger})
-    : _httpClient = httpClient ?? FluzerHttpClient(logger: logger),
-      _logger = logger ?? Logger();
+  TemplateSourceResolver({
+    FluzerHttpClient? httpClient,
+    Logger? logger,
+    Translations? messages,
+  }) : _httpClient = httpClient ?? FluzerHttpClient(logger: logger, messages: messages),
+       _messages = messages ?? AppLocale.zh.buildSync(),
+       _logger = logger ?? Logger();
 
   final FluzerHttpClient _httpClient;
+  final Translations _messages;
   final Logger _logger;
 
   /// 解析当前应使用的 [BrickLoader]（详见文件头优先级说明）。
@@ -54,27 +60,22 @@ class TemplateSourceResolver {
     // 1. 本地开发 / 调试：显式指定本地 bricks 目录时优先使用。
     final bricksDir = Platform.environment['FLUZER_BRICKS_DIR'];
     if (bricksDir != null && bricksDir.isNotEmpty) {
-      _logger.detail(
-        '正在使用环境变量\'FLUZER_BRICKS_DIR\'执行的模板目录。 '
-        'The template directory that is being executed using environment variables \'FLUZER_BRICKS_DIR\'',
-      );
+      _logger.detail(_messages.template.usingBricksDir);
       _logger.detail('FLUZER_BRICKS_DIR = $bricksDir');
-      return LocalBrickLoader(Directory(bricksDir));
+      return LocalBrickLoader(Directory(bricksDir), messages: _messages);
     }
 
     // 2. 测试 / 调试：允许通过环境变量强制指定远程 URL。
     // url必须是发布的可以下载的github链接。
     final overrideUrl = Platform.environment['FLUZER_TEMPLATE_ZIP_URL'];
     if (overrideUrl != null && overrideUrl.isNotEmpty) {
-      _logger.detail(
-        '正在使用环境变量\'FLUZER_TEMPLATE_ZIP_URL\'模板下载地址。 '
-        'The environment variable \'FLUZER_TEMPLATE_ZIP_URL\' template is being used to download the address.',
-      );
+      _logger.detail(_messages.template.usingZipUrl);
       _logger.detail('FLUZER_TEMPLATE_ZIP_URL = $overrideUrl');
       return RemoteBrickLoader(
         zipUrl: overrideUrl,
         templateVersion: VersionExtractor.extractVersion(overrideUrl),
         httpClient: _httpClient,
+        messages: _messages,
       );
     }
     // 3. 远程：从 registry 选取模板 zip URL（失败回退内置默认值）。
@@ -85,6 +86,7 @@ class TemplateSourceResolver {
       zipUrl: selected.url,
       templateVersion: selected.version,
       httpClient: _httpClient,
+      messages: _messages,
     );
   }
 
@@ -128,7 +130,7 @@ class TemplateSourceResolver {
       }
       return (url: bestUrl, version: bestVersion.toString());
     } on Object catch (e) {
-      _logger.detail('Registry fetch failed, using default template zip: $e');
+      _logger.detail(_messages.template.registryFallback(error: e));
       return (url: defaultTemplateZipUrl, version: null);
     }
   }
@@ -144,11 +146,7 @@ class TemplateSourceResolver {
     try {
       final body = await _httpClient.getText(registryUrl);
       if (body == null) {
-        throw CliException(
-          '无法拉取模板 registry，无法定位模板版本 $version 的下载源。\n'
-          'Could not fetch the template registry to locate download source '
-          'for template version $version.',
-        );
+        throw CliException(_messages.template.registryUnavailable(version: version));
       }
 
       final json = jsonDecode(body) as Map<String, dynamic>;
@@ -160,25 +158,20 @@ class TemplateSourceResolver {
           final url = t['url'] as String?;
           if (url == null || url.isEmpty) {
             throw CliException(
-              '模板版本 $version 在 registry 中缺少有效的 url 字段。\n'
-              'Template version $version has no valid "url" in the registry.',
+              _messages.template.registryMissingUrl(version: version),
             );
           }
           return (url: url, version: entryVersion);
         }
       }
       throw CliException(
-        '当前模板 registry 未收录版本 $version，请确认该模板版本已发布，'
-        '或升级 fluzer 到支持该模板的版本。\n'
-        'Template version $version was not found in the registry. '
-        'Confirm it is published or upgrade fluzer.',
+        _messages.template.registryVersionNotFound(version: version),
       );
     } on CliException {
       rethrow;
     } on Object catch (e) {
       throw CliException(
-        '定位模板版本 $version 的下载源失败：$e\n'
-        'Failed to locate download source for template version $version: $e',
+        _messages.template.registryLocateFailed(version: version, error: e),
       );
     }
   }

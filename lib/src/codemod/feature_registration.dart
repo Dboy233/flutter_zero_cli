@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
+
 import '../util/string_case.dart';
 import 'code_mod.dart';
 
@@ -19,12 +21,18 @@ class FeatureRegistration {
   /// Creates the registration.
   ///
   /// [featureName] is the snake_case feature name.
-  FeatureRegistration(this.featureName);
+  FeatureRegistration(this.featureName, {Translations? messages})
+    : _messages = messages ?? AppLocale.zh.buildSync();
 
   /// 功能名。
   ///
   /// Feature name.
   final String featureName;
+
+  /// 本地化消息（类型安全访问器）。
+  ///
+  /// Localized messages (type-safe accessors).
+  final Translations _messages;
 
   String get _pascal => toPascalCase(featureName);
   String get _moduleClass => '${_pascal}Module';
@@ -35,7 +43,7 @@ class FeatureRegistration {
   ///
   /// Applies the registration to [injectionBaseFile].
   Future<void> applyTo(File injectionBaseFile) async {
-    final mod = CodeMod(injectionBaseFile);
+    final mod = CodeMod(injectionBaseFile, messages: _messages);
     await mod.addImport(_importUri);
     await mod.insertAtMethodEnd(
       className: 'InjectionBase',

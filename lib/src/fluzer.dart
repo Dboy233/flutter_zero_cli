@@ -13,6 +13,7 @@ import 'commands/create_command.dart';
 import 'commands/gen_l10n_command.dart';
 import 'commands/new_command.dart';
 import 'commands/version_command.dart';
+import 'i18n/i18n.dart';
 import 'process/process_runner.dart';
 
 /// CLI 主类，注册并分发命令 / Main CLI class, registers and dispatches commands
@@ -45,31 +46,53 @@ class Fluzer {
     // 子进程原始输出保留不清除、异常附带完整堆栈。先扫原始参数是因为兜底
     // catch 可能发生在参数解析之前，此时拿不到 runner 的 [ArgResults]。
     final debug = _isDebug(arguments);
+    // 区域解析同样先扫原始参数：--locale 决定消息语言，需在构造命令前确定。
+    final rawLocale = _parseLocaleArg(arguments);
     // mason_logger 自带级别区分：--log 时进入 verbose（放行 detail() 调试日志、
     // 子进程原始输出与异常堆栈）；否则默认 info。可见性全部由 logger.level 驱动，
     // 不再需要额外的策略对象。
     final logger = Logger(level: debug ? Level.verbose : Level.info);
+    // 解析目标区域并构建对应语言的消息实例（异步加载非基础语言的延迟库）。
+    final messages = await MessagesProvider(rawLocale: rawLocale).build();
 
     final pr = processRunner ?? ProcessRunner();
 
-    final runner =
-        CommandRunner<int>(
-            'fluzer',
-            'Flutter MVI 模板项目脚手架工具\n'
-                'A CLI tool for scaffolding Flutter MVI projects.',
-          )
-          ..argParser.addFlag(
-            'log',
-            abbr: 'l',
-            negatable: false,
-            help: '调试模式：显示详细日志、子进程原始输出与异常堆栈 / '
-                'Debug mode: verbose logs, raw subprocess output and stack traces',
-          )
-          ..addCommand(CreateCommand(logger: logger, workingDirectory: workingDirectory, processRunner: pr))
-          ..addCommand(NewCommand(logger: logger, workingDirectory: workingDirectory, processRunner: pr))
-          ..addCommand(GenL10nCommand(logger: logger, workingDirectory: workingDirectory, processRunner: pr))
-          ..addCommand(VersionCommand(logger: logger))
-          ..addCommand(CacheCommand(logger: logger));
+    final runner = CommandRunner<int>('fluzer', messages.app.description);
+    runner.argParser
+      ..addFlag(
+        'log',
+        abbr: 'l',
+        negatable: false,
+        help: messages.app.logFlagHelp,
+      )
+      ..addOption('locale', abbr: 'L', help: messages.app.localeFlagHelp);
+    runner
+      ..addCommand(
+        CreateCommand(
+          logger: logger,
+          workingDirectory: workingDirectory,
+          processRunner: pr,
+          messages: messages,
+        ),
+      )
+      ..addCommand(
+        NewCommand(
+          logger: logger,
+          workingDirectory: workingDirectory,
+          processRunner: pr,
+          messages: messages,
+        ),
+      )
+      ..addCommand(
+        GenL10nCommand(
+          logger: logger,
+          workingDirectory: workingDirectory,
+          processRunner: pr,
+          messages: messages,
+        ),
+      )
+      ..addCommand(VersionCommand(logger: logger, messages: messages))
+      ..addCommand(CacheCommand(logger: logger, messages: messages));
 
     try {
       final result = await runner.run(arguments);
@@ -84,7 +107,7 @@ class Fluzer {
       // 或命令遗漏捕获的运行时错误），统一以退出码 1 返回并给出友好提示，
       // 避免泄漏内部堆栈并以 255 退出。--log 时附加完整堆栈。
       logger
-        ..err('执行出错 / An unexpected error occurred:')
+        ..err(messages.app.unexpectedError)
         ..err('$e');
       if (debug) {
         logger.err('$st');
@@ -99,5 +122,23 @@ class Fluzer {
   /// 解析失败之前，此时拿不到 runner 的解析结果。
   bool _isDebug(List<String> arguments) {
     return arguments.contains('--log') || arguments.contains('-l');
+  }
+
+  /// 解析全局 `--locale` / `-L` 标志（支持 `--locale x`、`--locale=x`、
+  /// `-L x`、`-Lx` 四种写法）。
+  ///
+  /// 同样直接扫描原始参数：区域需在命令构造前确定，而此时尚无 [ArgResults]。
+  String? _parseLocaleArg(List<String> arguments) {
+    for (var i = 0; i < arguments.length; i++) {
+      final arg = arguments[i];
+      if (arg == '--locale' || arg == '-L') {
+        if (i + 1 < arguments.length) return arguments[i + 1];
+      } else if (arg.startsWith('--locale=')) {
+        return arg.substring('--locale='.length);
+      } else if (arg.startsWith('-L') && arg.length > 2) {
+        return arg.substring(2);
+      }
+    }
+    return null;
   }
 }

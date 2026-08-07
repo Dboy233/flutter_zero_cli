@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:fluzer/src/version/version_check.dart';
 import 'package:fluzer/src/version/version_check_mixin.dart';
 import 'package:mason_logger/mason_logger.dart';
@@ -29,6 +30,9 @@ class _FakeCmd extends Command<int> with VersionCheckMixin {
   final VersionCheckService _versionCheckService;
   @override
   VersionCheckService get versionCheckService => _versionCheckService;
+
+  @override
+  Translations get messages => AppLocale.zh.buildSync();
 
   @override
   String get name => 'fake';

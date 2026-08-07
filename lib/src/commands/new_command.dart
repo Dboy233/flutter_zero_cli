@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:mason_logger/mason_logger.dart';
 
 import '../config/project_config.dart';
@@ -47,9 +48,11 @@ class NewCommand extends Command<int> with VersionCheckMixin {
     this.workingDirectory,
     VersionCheckService? versionCheckService,
     ProcessRunner? processRunner,
+    Translations? messages,
   }) : _logger = logger ?? Logger(),
        // ignore: prefer_initializing_formals
        _loader = loader,
+       _messages = messages ?? AppLocale.zh.buildSync(),
        _versionCheckService =
            versionCheckService ??
            VersionCheckService(logger: logger ?? Logger()),
@@ -58,23 +61,24 @@ class NewCommand extends Command<int> with VersionCheckMixin {
     argParser
       ..addFlag(
         'build-runner',
-        help:
-            '生成后是否运行 build_runner / '
-            'Whether to run build_runner after generation',
+        help: _messages.feature.buildRunnerHelp,
         defaultsTo: true,
         negatable: true,
       )
       ..addFlag(
         'skip-version-check',
         negatable: false,
-        help:
-            '跳过项目模板版本与 CLI 版本兼容门禁 / '
-            'Skip the project-template/CLI version compatibility gate',
+        help: _messages.feature.skipVersionCheckHelp,
       );
   }
 
   final Logger _logger;
   final BrickLoader? _loader;
+
+  /// 本地化消息（类型安全访问器）。
+  ///
+  /// Localized messages (type-safe accessors).
+  final Translations _messages;
 
   /// 注入的版本检查服务（测试用）；省略时创建默认实例。
   ///
@@ -86,6 +90,9 @@ class NewCommand extends Command<int> with VersionCheckMixin {
 
   @override
   Logger get logger => _logger;
+
+  @override
+  Translations get messages => _messages;
 
   @override
   VersionCheckService get versionCheckService => _versionCheckService;
@@ -103,7 +110,7 @@ class NewCommand extends Command<int> with VersionCheckMixin {
   String get name => 'new';
 
   @override
-  String get description => '新增功能模块 / Add a new feature module';
+  String get description => _messages.feature.description;
 
   @override
   Future<int> run() async {
@@ -113,7 +120,7 @@ class NewCommand extends Command<int> with VersionCheckMixin {
 
     final featureName = argResults?.rest.firstOrNull;
     if (featureName == null) {
-      _logger.err('错误：请指定功能名 / Error: please specify a feature name');
+      _logger.err(_messages.feature.nameRequired);
       printUsage();
       return 1;
     }
@@ -127,12 +134,18 @@ class NewCommand extends Command<int> with VersionCheckMixin {
       // work 内部只用 detail（非 verbose 下被抑制），避免破坏 spinner 行。
       await runWithSpinner(
         logger: _logger,
-        message: '步骤 1/4：加载项目配置与版本门禁 ...',
+        messages: _messages,
+        message: _messages.feature.step1Load,
         work: () async {
           config = await ProjectConfig.load(start: workingDirectory);
-          _logger.detail('  项目根目录: ${config.projectRoot}');
           _logger.detail(
-            '  项目模板版本: ${config.version}，要求 CLI >= ${config.minCliVersion}',
+            _messages.feature.detailProjectRoot(path: config.projectRoot),
+          );
+          _logger.detail(
+            _messages.feature.versionGateDetail(
+              version: config.version,
+              minCliVersion: config.minCliVersion,
+            ),
           );
 
           // 版本门禁：校验当前 CLI 是否支持该项目的模板版本。
@@ -140,12 +153,11 @@ class NewCommand extends Command<int> with VersionCheckMixin {
           if (!(argResults!['skip-version-check'] as bool) &&
               !config.isCliCompatible(cliVersion)) {
             throw CliException(
-              '当前 CLI 版本 $cliVersion 过低，项目模板 ${config.version} '
-              '需要 CLI >= ${config.minCliVersion}。请升级 fluzer 后重试，'
-              '或确认项目配置。\n'
-              'Current CLI version $cliVersion is too low; project template '
-              '${config.version} requires CLI >= ${config.minCliVersion}. '
-              'Please upgrade fluzer or check the project config.',
+              _messages.version.gateTooLow(
+                cliVersion: cliVersion,
+                version: config.version,
+                minCliVersion: config.minCliVersion,
+              ),
             );
           }
         },
@@ -153,56 +165,60 @@ class NewCommand extends Command<int> with VersionCheckMixin {
 
       await runWithSpinner(
         logger: _logger,
-        message: '步骤 2/4：解析模板加载器（本地或远程下载）...',
+        messages: _messages,
+        message: _messages.feature.step2Template,
         work: () async {
-          _logger.detail('  按项目模板版本 ${config.version} 钉死下载源');
+          _logger.detail(
+            _messages.feature.detailPinnedVersion(version: config.version),
+          );
           brickLoader =
               _loader ??
               await TemplateSourceResolver(
                 logger: _logger,
+                messages: _messages,
               ).resolve(pinnedVersion: config.version);
         },
       );
 
       await runWithSpinner(
         logger: _logger,
-        message: '步骤 3/4：生成功能模块 $featureName ...',
+        messages: _messages,
+        message: _messages.feature.step3Generate(feature: featureName),
         work: () async {
           final generator = FeatureGenerator(
             config: config,
             renderer: BrickRenderer(brickLoader),
+            messages: _messages,
           );
           await generator.generate(featureName);
-          _logger.detail('  已生成功能模块 $featureName');
+          _logger.detail(
+            _messages.feature.detailGenerated(feature: featureName),
+          );
         },
       );
 
       _logger.success(
-        '功能模块 $featureName 已创建并注册到 DI。\n'
-        'Feature module $featureName has been created and registered in DI.',
+        _messages.feature.successCreated(feature: featureName),
       );
 
       final runBuildRunner = argResults!['build-runner'] as bool;
       if (runBuildRunner) {
         final exitCode = await runWithSpinner(
           logger: _logger,
-          message: '步骤 4/4：运行 build_runner ...',
+          messages: _messages,
+          message: _messages.feature.step4BuildRunner,
           work: () => _buildRunner(
             config.projectRoot,
             buildFilter: 'lib/features/$featureName/**.dart',
           ),
         );
         if (exitCode != 0) {
-          _logger.err('build_runner 执行失败。\nbuild_runner failed.');
+          _logger.err(_messages.feature.buildRunnerFailed);
           return exitCode;
         }
-        _logger.success('build_runner 执行完成。\nbuild_runner completed.');
+        _logger.success(_messages.feature.buildRunnerCompleted);
       } else {
-        _logger.info(
-          '跳过 build_runner，可手动运行：\n'
-          'Skipped build_runner; run it manually with:\n'
-          '  dart run build_runner build',
-        );
+        _logger.info(_messages.feature.skipBuildRunner);
       }
 
       return 0;
@@ -210,7 +226,7 @@ class NewCommand extends Command<int> with VersionCheckMixin {
       _logger.err(e.message);
       return 1;
     } on Object catch (e) {
-      _logger.err('生成失败 / Generation failed: $e');
+      _logger.err(_messages.feature.generationFailed(error: e));
       return 1;
     }
   }

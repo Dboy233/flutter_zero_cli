@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:mason_logger/mason_logger.dart';
 import 'package:path/path.dart' as path;
 
@@ -39,7 +40,9 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
     VersionCheckService? versionCheckService,
     ProcessRunner? processRunner,
     ToastHandlePatcher? patcher,
+    Translations? messages,
   }) : _logger = logger ?? Logger(),
+       _messages = messages ?? AppLocale.zh.buildSync(),
        _versionCheckService =
            versionCheckService ??
            VersionCheckService(logger: logger ?? Logger()),
@@ -50,27 +53,26 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
       ..addFlag(
         'skip-handle-patch',
         negatable: false,
-        help:
-            '跳过 defaultToastHandle 自动接线 / '
-            'Skip patching defaultToastHandle.',
+        help: _messages.genL10n.skipHandlePatchHelp,
       )
       ..addFlag(
         'force-handle-patch',
         negatable: false,
-        help:
-            'l10nCode 分支已被自定义时也强制覆盖 / '
-            'Overwrite even if the l10nCode branch was customized.',
+        help: _messages.genL10n.forceHandlePatchHelp,
       )
       ..addFlag(
         'skip-version-check',
         negatable: false,
-        help:
-            '跳过项目模板版本与 CLI 版本兼容门禁 / '
-            'Skip the project-template/CLI version compatibility gate',
+        help: _messages.genL10n.skipVersionCheckHelp,
       );
   }
 
   final Logger _logger;
+
+  /// 本地化消息（类型安全访问器）。
+  ///
+  /// Localized messages (type-safe accessors).
+  final Translations _messages;
 
   /// 注入的版本检查服务（测试用）；省略时创建默认实例。
   ///
@@ -84,6 +86,9 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
 
   @override
   Logger get logger => _logger;
+
+  @override
+  Translations get messages => _messages;
 
   @override
   VersionCheckService get versionCheckService => _versionCheckService;
@@ -104,9 +109,7 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
   String get name => 'gen-l10n';
 
   @override
-  String get description =>
-      '生成国际化代码并自动创建 L10nCode 类 / '
-      'Generate localization code and create L10nCode class';
+  String get description => _messages.genL10n.description;
 
   @override
   Future<int> run() async {
@@ -128,7 +131,8 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
       // spinner 结束后，避免破坏 spinner 动画所在的行。
       await runWithSpinner(
         logger: _logger,
-        message: '步骤 1/6：校验项目与版本门禁 ...',
+        messages: _messages,
+        message: _messages.genL10n.step1Validate,
         work: () async {
           config = await ProjectConfig.load(start: workingDirectory);
           projectRoot = config.projectRoot;
@@ -136,12 +140,11 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
           if (!(argResults!['skip-version-check'] as bool) &&
               !config.isCliCompatible(cliVersion)) {
             throw CliException(
-              '当前 CLI 版本 $cliVersion 过低，项目模板 ${config.version} '
-              '需要 CLI >= ${config.minCliVersion}。请升级 fluzer 后重试，'
-              '或确认项目配置。\n'
-              'Current CLI version $cliVersion is too low; project template '
-              '${config.version} requires CLI >= ${config.minCliVersion}. '
-              'Please upgrade fluzer or check the project config.',
+              _messages.version.gateTooLow(
+                cliVersion: cliVersion,
+                version: config.version,
+                minCliVersion: config.minCliVersion,
+              ),
             );
           }
         },
@@ -150,7 +153,8 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
       // 2. 解析 l10n.yaml（字段缺失回退模板默认值）
       await runWithSpinner(
         logger: _logger,
-        message: '步骤 2/6：解析 l10n.yaml 与 ARB 目录 ...',
+        messages: _messages,
+        message: _messages.genL10n.step2Parse,
         work: () async {
           l10nConfig = await L10nConfig.load(projectRoot);
           _logger.detail(
@@ -164,9 +168,7 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
           );
           if (!await arbDir.exists()) {
             throw CliException(
-              '未找到 ${l10nConfig.arbDir} 目录，请确保项目已配置国际化。\n'
-              'Could not find ${l10nConfig.arbDir} directory. '
-              'Make sure l10n is configured in this project.',
+              _messages.genL10n.arbDirNotFound(dir: l10nConfig.arbDir),
             );
           }
           arbFiles = await arbDir
@@ -175,8 +177,7 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
               .toList();
           if (arbFiles.isEmpty) {
             throw CliException(
-              '${l10nConfig.arbDir} 目录中没有找到 .arb 文件。\n'
-              'No .arb files found in ${l10nConfig.arbDir} directory.',
+              _messages.genL10n.noArbFiles(dir: l10nConfig.arbDir),
             );
           }
           _logger.detail(
@@ -185,36 +186,33 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
         },
       );
       _logger.success(
-        '找到 ${arbFiles.length} 个 .arb 文件 / '
-        'Found ${arbFiles.length} .arb file(s)',
+        _messages.genL10n.foundArbFiles(count: arbFiles.length),
       );
 
       // 3. 执行 flutter gen-l10n
       final exitCode = await runWithSpinner(
         logger: _logger,
-        message: '步骤 3/6：执行 flutter gen-l10n ...',
+        messages: _messages,
+        message: _messages.genL10n.step3GenL10n,
         work: () => _flutterGenL10n(projectRoot),
       );
       if (exitCode != 0) {
-        _logger.err(
-          'flutter gen-l10n 执行失败（退出码: $exitCode）。\n'
-          'flutter gen-l10n failed (exit code: $exitCode).',
-        );
+        _logger.err(_messages.genL10n.flutterFailed(code: exitCode));
         return exitCode;
       }
 
       // 4. 解析本地化成员
       await runWithSpinner(
         logger: _logger,
-        message: '步骤 4/6：解析本地化成员 ...',
+        messages: _messages,
+        message: _messages.genL10n.step4Members,
         work: () async {
           final found = await _findGeneratedFile(projectRoot, l10nConfig);
           if (found == null) {
             throw CliException(
-              '未找到生成的 ${l10nConfig.outputLocalizationFile}，'
-              '请检查 l10n.yaml 中 output-dir 配置。\n'
-              'Generated ${l10nConfig.outputLocalizationFile} not found. '
-              'Check output-dir in l10n.yaml.',
+              _messages.genL10n.generatedFileNotFound(
+                file: l10nConfig.outputLocalizationFile,
+              ),
             );
           }
           appLocalizationsFile = found;
@@ -222,29 +220,34 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
           members = parseAppLocalizations(
             source,
             className: l10nConfig.outputClass,
+            messages: _messages,
           );
-          _logger.detail('  成员: ${members.map((m) => m.name).join(', ')}');
+          _logger.detail(
+            _messages.genL10n.detailMembers(
+              names: members.map((m) => m.name).join(', '),
+            ),
+          );
         },
       );
       final noParamCount = members.where((m) => !m.hasParams).length;
       final withParamCount = members.length - noParamCount;
       _logger.info(
-        '解析到 ${members.length} 个本地化成员 '
-        '($noParamCount 无参, $withParamCount 有参)',
+        _messages.genL10n.parsedMembers(
+          total: members.length,
+          noParam: noParamCount,
+          withParam: withParamCount,
+        ),
       );
       if (members.isEmpty) {
-        _logger.warn(
-          '未解析到任何本地化成员，请检查 arb 文件是否包含翻译 key。\n'
-          'No localization members found. '
-          'Check whether your arb files contain translation keys.',
-        );
+        _logger.warn(_messages.genL10n.noMembers);
       }
 
       // 5. 生成 L10nCode 等文件
       final generatedPaths = <String>[];
       await runWithSpinner(
         logger: _logger,
-        message: '步骤 5/6：生成 L10nCode 等文件 ...',
+        messages: _messages,
+        message: _messages.genL10n.step5Generate,
         work: () async {
           final genDir = path.joinAll([
             projectRoot,
@@ -267,19 +270,17 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
         },
       );
       for (final p in generatedPaths) {
-        _logger.success('已生成 / Generated: $p');
+        _logger.success(_messages.genL10n.generated(path: p));
       }
 
       // 6. 自动接线 defaultToastHandle（幂等，可用 --skip-handle-patch 跳过）
       if (argResults!['skip-handle-patch'] as bool) {
-        _logger.info(
-          '已跳过 defaultToastHandle 接线（--skip-handle-patch）/ '
-          'Skipped handle patch.',
-        );
+        _logger.info(_messages.genL10n.skippedHandlePatch);
       } else {
         final outcome = await runWithSpinner(
           logger: _logger,
-          message: '步骤 6/6：接线 defaultToastHandle ...',
+          messages: _messages,
+          message: _messages.genL10n.step6Wire,
           work: () => _patchDefaultToastHandle(
             projectRoot: projectRoot,
             packageName: config.packageName,
@@ -297,7 +298,7 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
       _logger.err(e.message);
       return 1;
     } on Object catch (e) {
-      _logger.err('gen-l10n 执行失败 / gen-l10n failed: $e');
+      _logger.err(_messages.genL10n.failed(error: e));
       return 1;
     }
   }
@@ -336,7 +337,7 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
     final outcome = await _patcher.patch(handleFile, force: force);
     if (outcome.result == ToastHandlePatchResult.patched) {
       // 补齐 import（幂等），随后 dart_style 库内统一格式化
-      final mod = CodeMod(handleFile, format: false);
+      final mod = CodeMod(handleFile, format: false, messages: _messages);
       await mod.addImport('package:$packageName/l10n/gen/l10n_code.dart');
       await mod.addImport(
         'package:$packageName/l10n/gen/l10n_toast_effect_helper.dart',
@@ -351,33 +352,19 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
     switch (outcome.result) {
       case ToastHandlePatchResult.patched:
         _logger.success(
-          'defaultToastHandle 已接线 L10nToastEffectHelper。\n'
-          'Wired L10nToastEffectHelper into defaultToastHandle.\n'
-          '被替换的分支原文 / Replaced branch:\n'
-          '${outcome.replacedSource?.trim()}',
+          _messages.genL10n.patched(
+            replaced: outcome.replacedSource?.trim() ?? '',
+          ),
         );
       case ToastHandlePatchResult.alreadyWired:
-        _logger.info('defaultToastHandle 已接线，跳过（幂等）/ Already wired, skipped.');
+        _logger.info(_messages.genL10n.alreadyWired);
       case ToastHandlePatchResult.customSkipped:
-        _logger.warn(
-          '检测到 l10nCode 分支已被自定义，跳过接线。\n'
-          '如需强制覆盖请使用 --force-handle-patch。\n'
-          'Customized l10nCode branch detected; skipped. '
-          'Use --force-handle-patch to overwrite.',
-        );
+        _logger.warn(_messages.genL10n.customSkipped);
       case ToastHandlePatchResult.anchorNotFound:
         if (_patchFileNotFound) {
-          _logger.warn(
-            '未找到 default_toast_effect_handle.dart，跳过自动接线。\n'
-            '请手动将 L10nToastEffectHelper 接入 defaultToastHandle。\n'
-            'Handle file not found; wire L10nToastEffectHelper manually.',
-          );
+          _logger.warn(_messages.genL10n.handleFileNotFound);
         } else {
-          _logger.warn(
-            '未找到 defaultToastHandle 的 l10nCode 分支锚点，跳过接线。\n'
-            '请手动接入 L10nToastEffectHelper。\n'
-            'Branch anchor not found; wire L10nToastEffectHelper manually.',
-          );
+          _logger.warn(_messages.genL10n.branchAnchorNotFound);
         }
     }
   }

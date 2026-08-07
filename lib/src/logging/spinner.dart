@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:mason_logger/mason_logger.dart';
 
 /// 在执行某一步骤期间显示一个旋转 spinner（表示「正在执行」），完成后将
@@ -25,6 +26,7 @@ import 'package:mason_logger/mason_logger.dart';
 /// no spinner should be shown (debug mode or non-terminal).
 Future<T> runWithSpinner<T>({
   required Logger logger,
+  required Translations messages,
   required String message,
   required Future<T> Function() work,
 }) async {
@@ -38,11 +40,11 @@ Future<T> runWithSpinner<T>({
   try {
     final result = await work();
     final label = message.trim().replaceFirst(RegExp(r'\.\.\.$'), '');
-    progress.complete('$label 完成');
+    progress.complete(messages.spinner.stepCompleted(label: label));
     return result;
   } on Object {
     final label = message.trim().replaceFirst(RegExp(r'\.\.\.$'), '');
-    progress.fail('$label 失败');
+    progress.fail(messages.spinner.stepFailed(label: label));
     rethrow;
   }
 }

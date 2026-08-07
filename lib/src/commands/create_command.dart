@@ -6,6 +6,7 @@
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:mason_logger/mason_logger.dart';
 import 'package:path/path.dart' as p;
 
@@ -72,9 +73,11 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
     this.workingDirectory,
     VersionCheckService? versionCheckService,
     ProcessRunner? processRunner,
+    Translations? messages,
   }) : _logger = logger ?? Logger(),
        // ignore: prefer_initializing_formals
        _loader = loader,
+       _messages = messages ?? AppLocale.zh.buildSync(),
        _versionCheckService =
            versionCheckService ??
            VersionCheckService(logger: logger ?? Logger()),
@@ -85,12 +88,13 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
     argParser.addOption(
       'org',
       defaultsTo: 'com.example',
-      help: '组织标识（影响 bundle ID） / Organization identifier (affects bundle ID)',
+      help: _messages.create.orgHelp,
     );
   }
 
   final Logger _logger;
   final BrickLoader? _loader;
+  final Translations _messages;
 
   /// 注入的版本检查服务（测试用）；省略时创建默认实例。
   ///
@@ -102,6 +106,9 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
 
   @override
   Logger get logger => _logger;
+
+  @override
+  Translations get messages => _messages;
 
   @override
   VersionCheckService get versionCheckService => _versionCheckService;
@@ -121,8 +128,7 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
   String get name => 'create';
 
   @override
-  String get description =>
-      '从模板创建全新 Flutter 项目 / Create a new Flutter project from the template';
+  String get description => _messages.create.description;
 
   @override
   String get invocation => 'fluzer create <project_name>';
@@ -135,18 +141,14 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
 
     final projectName = argResults?.rest.firstOrNull;
     if (projectName == null) {
-      _logger.err('错误：请指定项目名 / Error: please specify a project name');
+      _logger.err(_messages.create.nameRequired);
       printUsage();
       return 1;
     }
 
     // 校验项目名合法性
     if (!_isValidProjectName(projectName)) {
-      _logger.err(
-        '项目名不合法：必须只包含小写字母、数字和下划线，且以字母开头。\n'
-        'Invalid project name: must contain only lowercase letters, digits, '
-        'and underscores, starting with a letter.',
-      );
+      _logger.err(_messages.create.nameInvalid);
       return 1;
     }
 
@@ -162,65 +164,65 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
       // work 内部只用 detail（非 verbose 下被抑制），避免破坏 spinner 行。
       await runWithSpinner(
         logger: _logger,
-        message: '步骤 1/6：校验项目名与目录 ...',
+        messages: _messages,
+        message: _messages.create.step1Validate,
         work: () async {
           if (!_isValidProjectName(projectName)) {
-            throw CliException(
-              '项目名不合法：必须只包含小写字母、数字和下划线，且以字母开头。\n'
-              'Invalid project name: must contain only lowercase letters, '
-              'digits, and underscores, starting with a letter.',
-            );
+            throw CliException(_messages.create.nameInvalid);
           }
-          _logger.detail('  项目名: $projectName, 组织: $org');
+          _logger.detail(
+            _messages.create.detailProject(name: projectName, org: org),
+          );
           // 检查目标目录是否已存在
           if (Directory(targetDir).existsSync()) {
-            throw CliException(
-              '目录 $projectName 已存在，请选择不同的项目名。\n'
-              'Directory $projectName already exists. '
-              'Please choose a different project name.',
-            );
+            throw CliException(_messages.create.dirExists(name: projectName));
           }
         },
       );
 
       await runWithSpinner(
         logger: _logger,
-        message: '步骤 2/6：用 Mason 渲染 project 模板 ...',
+        messages: _messages,
+        message: _messages.create.step2Render,
         work: () async {
           // 直接渲染到当前目录：brick 的 {{name}} 层展开后即为 targetDir
           final brickLoader =
               _loader ??
-              await TemplateSourceResolver(logger: _logger).resolve();
+              await TemplateSourceResolver(
+                logger: _logger,
+                messages: _messages,
+              ).resolve();
           final renderer = BrickRenderer(brickLoader);
           await renderer.generate(
             brickName: 'project',
             outputDir: workingDirectory ?? Directory.current,
             vars: {'name': projectName},
           );
-          _logger.detail('  已生成 $targetDir');
+          _logger.detail(_messages.create.detailGenerated(path: targetDir));
         },
       );
 
       await _runOrThrow(
-        '步骤 3/6：执行 flutter create . ...',
+        _messages.create.step3FlutterCreate,
         () => _flutterCreate(targetDir, projectName: projectName, org: org),
       );
 
       await runWithSpinner(
         logger: _logger,
-        message: '步骤 4/6：清理 flutter create 生成的多余测试文件 ...',
+        messages: _messages,
+        message: _messages.create.step4CleanTest,
         work: () async {
           _cleanTests(targetDir);
         },
       );
 
       await _runOrThrow(
-        '步骤 5/6：执行 flutter pub get ...',
+        _messages.create.step5PubGet,
         () => _flutterPubGet(targetDir),
       );
 
       await _runOrThrow(
-        '步骤 6/6：执行 flutter gen-l10n ...',
+        _messages.create.step6GenL10n,
         () => _flutterGenL10n(targetDir),
       );
 
@@ -232,15 +234,11 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
       _cleanupOnFailure(targetDir);
       return 1;
     } on ProcessException catch (e) {
-      _logger.err(
-        '未找到 Flutter 命令。请确保 Flutter SDK 已正确安装并在 PATH 中。\n'
-        'Flutter command not found. Make sure Flutter SDK is installed and in PATH.\n'
-        '原始错误 / Original error: ${e.message}',
-      );
+      _logger.err(_messages.create.flutterNotFound(error: e.message));
       _cleanupOnFailure(targetDir);
       return 1;
     } on Object catch (e) {
-      _logger.err('创建失败 / Creation failed: $e');
+      _logger.err(_messages.create.failed(error: e));
       _cleanupOnFailure(targetDir);
       return 1;
     }
@@ -259,13 +257,13 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
   Future<void> _runOrThrow(String step, Future<int> Function() runner) async {
     final code = await runWithSpinner(
       logger: _logger,
+      messages: _messages,
       message: step,
       work: runner,
     );
     if (code != 0) {
       throw CliException(
-        '$step 执行失败 (exit code: $code)\n'
-        '$step failed (exit code: $code)',
+        _messages.create.stepFailedWithCode(step: step, code: code),
       );
     }
   }
@@ -281,12 +279,12 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
 
   /// 打印完成信息 / Prints completion message
   void _done(String targetDir, String projectName) {
-    _logger.success('\n项目创建完成！ / Project created successfully!');
+    _logger.success(_messages.create.created);
     _logger.info('');
-    _logger.info('后续步骤 / Next steps:');
+    _logger.info(_messages.create.nextSteps);
     _logger.info('  1. cd $projectName');
-    _logger.info('  2. fluzer new my_feature （可选：添加功能模块）');
-    _logger.info('  3. flutter run           （启动应用）');
+    _logger.info(_messages.create.stepNewFeature);
+    _logger.info(_messages.create.stepFlutterRun);
   }
 
   /// 清理 flutter create 生成的多余测试文件。
@@ -305,9 +303,9 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
     if (widgetTest.existsSync()) {
       try {
         widgetTest.deleteSync();
-        _logger.detail('  已删除 / Removed: test/widget_test.dart');
+        _logger.detail(_messages.create.removedWidgetTest);
       } on Object catch (e) {
-        _logger.detail('  删除 widget_test.dart 失败: $e');
+        _logger.detail(_messages.create.removeWidgetTestFailed(error: e));
       }
     }
   }
@@ -320,9 +318,9 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
     if (dir.existsSync()) {
       try {
         dir.deleteSync(recursive: true);
-        _logger.detail('  已清理失败目录 / Cleaned up failed directory');
+        _logger.detail(_messages.create.cleanedFailedDir);
       } on Object catch (e) {
-        _logger.detail('  清理失败目录失败 / Cleanup failed: $e');
+        _logger.detail(_messages.create.cleanupFailedDir(error: e));
       }
     }
   }

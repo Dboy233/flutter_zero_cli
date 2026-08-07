@@ -7,6 +7,8 @@
 /// abstract member declarations from the `AppLocalizations` class body.
 library;
 
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
+
 import 'l10n_param_type.dart';
 
 /// 本地化方法参数（名称 + Dart 类型）。
@@ -62,8 +64,9 @@ class L10nMember {
 List<L10nMember> parseAppLocalizations(
   String source, {
   String className = 'AppLocalizations',
+  required Translations messages,
 }) {
-  final body = extractClassBody(source, className);
+  final body = extractClassBody(source, className, messages);
   final members = <L10nMember>[];
 
   // String get xxx;（无参 getter）
@@ -76,14 +79,16 @@ List<L10nMember> parseAppLocalizations(
   final methodRegex =
       RegExp(r'^\s*String\s+(\w+)\(([^)]*)\)\s*;', multiLine: true);
   for (final m in methodRegex.allMatches(body)) {
-    members.add(L10nMember(m.group(1)!, _parseParams(m.group(2)!, m.group(1)!)));
+    members.add(
+      L10nMember(m.group(1)!, _parseParams(m.group(2)!, m.group(1)!, messages)),
+    );
   }
 
   return members;
 }
 
 /// 解析方法参数串 `"Object count, int index"` → [L10nParam] 列表。
-List<L10nParam> _parseParams(String paramsStr, String memberName) {
+List<L10nParam> _parseParams(String paramsStr, String memberName, Translations messages) {
   final params = <L10nParam>[];
   for (final raw in paramsStr.split(',')) {
     final trimmed = raw.trim();
@@ -91,8 +96,10 @@ List<L10nParam> _parseParams(String paramsStr, String memberName) {
     final m = RegExp(r'^(\w+)\s+(\w+)$').firstMatch(trimmed);
     if (m == null) {
       throw FormatException(
-        '无法解析成员 $memberName 的参数声明: "$trimmed"。\n'
-        'Unable to parse parameter "$trimmed" of member "$memberName".',
+        messages.l10nParser.paramParseFailed(
+          member: memberName,
+          param: trimmed,
+        ),
       );
     }
     params.add(L10nParam(m.group(2)!, m.group(1)!));
@@ -107,19 +114,19 @@ List<L10nParam> _parseParams(String paramsStr, String memberName) {
 ///
 /// Extracts the body of `abstract class <className>` using a
 /// brace-counting scanner that skips comments and string literals.
-String extractClassBody(String source, String className) {
+String extractClassBody(String source, String className, Translations messages) {
   final decl =
       RegExp('abstract\\s+class\\s+$className\\b').firstMatch(source);
   if (decl == null) {
     throw FormatException(
-      '未找到 abstract class $className 声明，请检查 l10n.yaml 的 output-class 配置。\n'
-      'Declaration "abstract class $className" not found. '
-      'Check "output-class" in l10n.yaml.',
+      messages.l10nParser.classNotFound(name: className),
     );
   }
   final start = source.indexOf('{', decl.end);
   if (start == -1) {
-    throw FormatException('$className 声明后未找到类体 / class body not found.');
+    throw FormatException(
+      messages.l10nParser.classBodyNotFound(name: className),
+    );
   }
 
   var depth = 0;
@@ -154,7 +161,7 @@ String extractClassBody(String source, String className) {
   }
 
   throw FormatException(
-    '$className 类体未闭合 / class body of $className is not closed.',
+    messages.l10nParser.classBodyUnclosed(name: className),
   );
 }
 

@@ -1,5 +1,6 @@
 import 'package:fluzer/src/gen_l10n/l10n_code_generator.dart';
 import 'package:fluzer/src/gen_l10n/l10n_parser.dart';
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -11,7 +12,7 @@ abstract class AppLocalizations {
   String get homeRefreshSuccess;
 }
 ''';
-      final members = parseAppLocalizations(source);
+      final members = parseAppLocalizations(source, messages: AppLocale.zh.buildSync());
       expect(members, hasLength(2));
       expect(members[0].name, 'appTitle');
       expect(members[0].hasParams, isFalse);
@@ -24,7 +25,7 @@ abstract class AppLocalizations {
   String counterValue(Object count);
 }
 ''';
-      final members = parseAppLocalizations(source);
+      final members = parseAppLocalizations(source, messages: AppLocale.zh.buildSync());
       expect(members, hasLength(1));
       expect(members[0].name, 'counterValue');
       expect(members[0].params, hasLength(1));
@@ -42,7 +43,7 @@ abstract class AppLocalizations {
   String multi(int count, String unit);
 }
 ''';
-      final members = parseAppLocalizations(source);
+      final members = parseAppLocalizations(source, messages: AppLocale.zh.buildSync());
       expect(members, hasLength(5));
 
       expect(members[0].params[0].type, 'int');
@@ -87,7 +88,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String counterValue(int count) => '计数：\$count';
 }
 ''';
-      final members = parseAppLocalizations(source);
+      final members = parseAppLocalizations(source, messages: AppLocale.zh.buildSync());
       // 只能解析出抽象类中的 2 个成员，不能重复计算实现类
       expect(members, hasLength(2));
       expect(members[0].name, 'appTitle');
@@ -102,7 +103,7 @@ abstract class AppLocalizations {
   String counterValue(int count);
 }
 ''';
-      final members = parseAppLocalizations(source);
+      final members = parseAppLocalizations(source, messages: AppLocale.zh.buildSync());
       expect(members, hasLength(1));
       expect(members[0].name, 'counterValue');
     });
@@ -113,14 +114,14 @@ abstract class MyL10n {
   String get appTitle;
 }
 ''';
-      final members = parseAppLocalizations(source, className: 'MyL10n');
+      final members = parseAppLocalizations(source, className: 'MyL10n', messages: AppLocale.zh.buildSync());
       expect(members, hasLength(1));
     });
 
     test('找不到抽象类时抛出 FormatException', () {
       const source = 'class NotAbstract {}';
       expect(
-        () => parseAppLocalizations(source),
+        () => parseAppLocalizations(source, messages: AppLocale.zh.buildSync()),
         throwsA(isA<FormatException>()),
       );
     });
@@ -132,7 +133,7 @@ abstract class AppLocalizations {
 }
 ''';
       expect(
-        () => parseAppLocalizations(source),
+        () => parseAppLocalizations(source, messages: AppLocale.zh.buildSync()),
         throwsA(isA<FormatException>()),
       );
     });

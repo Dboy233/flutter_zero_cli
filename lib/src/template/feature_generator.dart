@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:path/path.dart' as p;
 
 import '../codemod/feature_registration.dart';
@@ -19,7 +20,11 @@ class FeatureGenerator {
   /// 创建生成器。
   ///
   /// Creates the generator.
-  FeatureGenerator({required this.config, required this.renderer});
+  FeatureGenerator({
+    required this.config,
+    required this.renderer,
+    Translations? messages,
+  }) : _messages = messages ?? AppLocale.zh.buildSync();
 
   /// 项目配置。
   ///
@@ -30,6 +35,11 @@ class FeatureGenerator {
   ///
   /// Brick renderer.
   final BrickRenderer renderer;
+
+  /// 本地化消息（类型安全访问器）。
+  ///
+  /// Localized messages (type-safe accessors).
+  final Translations _messages;
 
   /// 生成功能模块。
   ///
@@ -45,10 +55,7 @@ class FeatureGenerator {
       p.join(config.projectRoot, 'lib', 'features', featureName),
     );
     if (await featureDir.exists()) {
-      throw CliException(
-        '功能模块 $featureName 已存在。\n'
-        'Feature module $featureName already exists.',
-      );
+      throw CliException(_messages.feature.featureExists(feature: featureName));
     }
 
     // Mason 直接把文件生成到项目根的 lib/features/<name>/ 下，
@@ -74,14 +81,10 @@ class FeatureGenerator {
   /// Validates the feature name format.
   void _validateFeatureName(String name) {
     if (name.isEmpty) {
-      throw CliException('功能名不能为空。\nFeature name cannot be empty.');
+      throw CliException(_messages.feature.featureNameEmpty);
     }
     if (!RegExp(r'^[a-z][a-z0-9_]*$').hasMatch(name)) {
-      throw CliException(
-        '功能名必须是 snake_case 且以小写字母开头，例如 user_profile。\n'
-        'Feature name must be snake_case and start with a lowercase letter, '
-        'e.g. user_profile.',
-      );
+      throw CliException(_messages.feature.featureNameInvalid);
     }
   }
 
@@ -98,6 +101,6 @@ class FeatureGenerator {
     final injectionBase = File(
       p.join(config.projectRoot, 'lib', 'core', 'di', 'injection_base.dart'),
     );
-    await FeatureRegistration(featureName).applyTo(injectionBase);
+    await FeatureRegistration(featureName, messages: _messages).applyTo(injectionBase);
   }
 }
