@@ -27,6 +27,7 @@ typedef ProcessRunFn =
       List<String> args, {
       String? workingDirectory,
       bool showLive,
+      bool runInShell,
     });
 
 /// 外部进程执行器。
@@ -50,6 +51,10 @@ class ProcessRunner {
   /// [showLive] 为 true 时实时透传子进程输出到控制台（仅终端有意义，
   /// 用于 `--log` 调试模式）；为 false 时子进程输出完全隐藏（仅缓冲并丢弃）。
   ///
+  /// [runInShell] 为 true 时通过系统 shell 启动进程。原生可执行文件
+  /// （如 dart）可传 false 以减少一层 shell 开销；批处理类入口（如 Windows
+  /// 上的 flutter.bat）必须传 true，否则系统找不到可执行文件。
+  ///
   /// [stdoutSink] / [stderrSink] 默认指向全局 stdout / stderr；测试可传入
   /// 捕获用的 [IOSink] 以断言可见性策略。
   ///
@@ -60,6 +65,7 @@ class ProcessRunner {
     List<String> args, {
     String? workingDirectory,
     bool showLive = false,
+    bool runInShell = false,
     IOSink? stdoutSink,
     IOSink? stderrSink,
   }) async {
@@ -70,6 +76,7 @@ class ProcessRunner {
         args,
         workingDirectory: workingDirectory,
         showLive: showLive,
+        runInShell: runInShell,
       );
     }
 
@@ -77,9 +84,21 @@ class ProcessRunner {
     final errSink = stderrSink ?? stderr;
 
     if (showLive) {
-      return _runLive(executable, args, workingDirectory, outSink, errSink);
+      return _runLive(
+        executable,
+        args,
+        workingDirectory,
+        outSink,
+        errSink,
+        runInShell,
+      );
     } else {
-      return _runHidden(executable, args, workingDirectory: workingDirectory);
+      return _runHidden(
+        executable,
+        args,
+        workingDirectory: workingDirectory,
+        runInShell: runInShell,
+      );
     }
   }
 
@@ -89,47 +108,50 @@ class ProcessRunner {
     String? workingDirectory,
     IOSink outSink,
     IOSink errSink,
+    bool runInShell,
   ) async {
     final process = await Process.start(
       executable,
       args,
       workingDirectory: workingDirectory,
-      runInShell: true,
+      runInShell: runInShell,
     );
 
-    final outDone = process.stdout
-        .transform(const SystemEncoding().decoder)
-        .forEach(outSink.write);
-    final errDone = process.stderr
-        .transform(const SystemEncoding().decoder)
-        .forEach(errSink.write);
+    // 直接透传原始字节（不经 SystemEncoding 逐字节解码），两流并发转发。
+    // 用 forEach(outSink.add) 替代 pipe：同一 IOSink 被多个 pipe 绑定会抛
+    // "StreamSink is bound to a stream"；forEach 内部以 add 写入，对共享 sink 安全。
+    final outDone = process.stdout.forEach(outSink.add);
+    final errDone = process.stderr.forEach(errSink.add);
     final code = await process.exitCode;
     await Future.wait([outDone, errDone]);
     return code;
   }
 
-  /// 隐藏模式执行：启动进程、收齐输出、直接丢弃，返回退出码。
+  /// 隐藏模式执行：启动进程、并发排空两个流并直接丢弃字节，返回退出码。
   ///
   /// 子进程输出不打印到控制台（无 --log 时用户无需看到），仅缓冲于内存后
   /// 丢弃——避免污染 fluzer 自身的步骤日志。重定向到文件 / CI 场景同样隐藏。
+  ///
+  /// 旧实现串行消费（先 await stdout 的 EOF 再读 stderr）会使 stderr 管道
+  /// 写满，build_runner 等高频写 stderr 的子进程因此被背压阻塞而卡慢。
+  /// 这里并发 drain 两流即可消除背压。
   Future<int> _runHidden(
     String executable,
     List<String> args, {
     String? workingDirectory,
+    bool runInShell = false,
   }) async {
     final process = await Process.start(
       executable,
       args,
       workingDirectory: workingDirectory,
-      runInShell: true,
+      runInShell: runInShell,
     );
-    // 必须排空两个流，否则子进程可能因管道写满而阻塞；内容直接丢弃。
-    await process.stdout
-        .transform(const SystemEncoding().decoder)
-        .forEach((_) {});
-    await process.stderr
-        .transform(const SystemEncoding().decoder)
-        .forEach((_) {});
-    return process.exitCode;
+    // 并发排空两个流并丢弃原始字节，避免管道背压导致子进程阻塞。
+    final outDone = process.stdout.drain<void>();
+    final errDone = process.stderr.drain<void>();
+    final code = await process.exitCode;
+    await Future.wait([outDone, errDone]);
+    return code;
   }
 }

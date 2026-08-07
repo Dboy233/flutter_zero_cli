@@ -400,6 +400,7 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
       ['gen-l10n'],
       workingDirectory: projectRoot,
       showLive: _logger.level == Level.verbose,
+      runInShell: true,
     );
   }
 }

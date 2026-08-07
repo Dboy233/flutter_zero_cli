@@ -347,6 +347,7 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
       args,
       workingDirectory: projectRoot,
       showLive: _logger.level == Level.verbose,
+      runInShell: true,
     );
   }
 
@@ -357,6 +358,7 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
       ['pub', 'get'],
       workingDirectory: projectRoot,
       showLive: _logger.level == Level.verbose,
+      runInShell: true,
     );
   }
 
@@ -367,6 +369,7 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
       ['gen-l10n'],
       workingDirectory: projectRoot,
       showLive: _logger.level == Level.verbose,
+      runInShell: true,
     );
   }
 }

@@ -197,9 +197,7 @@ class NewCommand extends Command<int> with VersionCheckMixin {
         },
       );
 
-      _logger.success(
-        _messages.feature.successCreated(feature: featureName),
-      );
+      _logger.success(_messages.feature.successCreated(feature: featureName));
 
       final runBuildRunner = argResults!['build-runner'] as bool;
       if (runBuildRunner) {

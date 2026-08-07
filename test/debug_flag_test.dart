@@ -69,6 +69,7 @@ void main() {
           List<String> args, {
           String? workingDirectory,
           bool showLive = false,
+          bool runInShell = false,
         }) {
           capturedShowLive = showLive;
           return Future.value(0);

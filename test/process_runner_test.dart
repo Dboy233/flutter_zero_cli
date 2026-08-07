@@ -127,6 +127,30 @@ void main() {
       ], showLive: false);
       expect(code, isNonZero);
     });
+
+    test('showLive:false —— 高频写 stderr 不触发管道背压死锁', () async {
+      // 旧实现串行消费（先 stdout 后 stderr）：子进程把大量诊断写进 stderr、
+      // 而 stdout 空闲时，stderr 管道被写满，子进程在 write 上阻塞且永远等
+      // 不到 stdout 的 EOF，形成死锁。新实现并发 drain 两流，应在短时间内返回。
+      final script = await _writeScript(
+        "import 'dart:io';\n"
+        "void main() {\n"
+        "  final chunk = '${'x' * 1024}';\n"
+        "  for (var i = 0; i < 300; i++) {\n"
+        '    stderr.write(chunk);\n'
+        "  }\n"
+        '}\n',
+      );
+      final code = await runner
+          .run(
+            Platform.resolvedExecutable,
+            ['run', script.path],
+            showLive: false,
+          )
+          .timeout(const Duration(seconds: 5));
+      await script.delete();
+      expect(code, 0);
+    }, timeout: const Timeout(Duration(seconds: 10)));
   });
 
   group('ProcessRunner 依赖注入（impl）', () {
@@ -141,7 +165,7 @@ void main() {
       String? capturedWorkingDirectory;
 
       final injected = ProcessRunner(
-        impl: (executable, args, {workingDirectory, bool showLive = false}) async {
+        impl: (executable, args, {workingDirectory, bool showLive = false, bool runInShell = false}) async {
           called = true;
           capturedExecutable = executable;
           capturedArgs = args;
@@ -169,7 +193,7 @@ void main() {
     test('impl 接收 showLive 的默认值（false）', () async {
       var capturedShowLive = true;
       final injected = ProcessRunner(
-        impl: (_, args, {workingDirectory, bool showLive = false}) async {
+        impl: (_, args, {workingDirectory, bool showLive = false, bool runInShell = false}) async {
           capturedShowLive = showLive;
           return 0;
         },
@@ -184,7 +208,7 @@ void main() {
       // 若 showLive 路径错误地把调用落回真实进程，dart --version 会成功返回 0；
       // 这里用 impl 固定返回 7，验证全程走注入实现。
       final injected = ProcessRunner(
-        impl: (_, args, {workingDirectory, bool showLive = false}) async => 7,
+        impl: (_, args, {workingDirectory, bool showLive = false, bool runInShell = false}) async => 7,
       );
       final code = await injected.run(
         Platform.resolvedExecutable,

@@ -4,6 +4,10 @@
 
 - Terminal CLI is now localized: Chinese (zh), English (en) and Japanese (ja) are supported. A new global `--locale`/`-L` flag selects the UI language; when omitted, it follows the system locale or environment variables.
 
+### Changed
+
+- Subprocess output is now drained concurrently for both stdout and stderr. This eliminates a pipe-backpressure stall that made child commands (notably `build_runner` during `new`) extremely slow when run without `--log`.
+
 ## 1.1.3
 
 ### Changed
