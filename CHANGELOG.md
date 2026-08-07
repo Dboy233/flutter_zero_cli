@@ -1,3 +1,9 @@
+## 1.2.0
+
+### Added
+
+- Terminal CLI is now localized: Chinese (zh), English (en) and Japanese (ja) are supported. A new global `--locale`/`-L` flag selects the UI language; when omitted, it follows the system locale or environment variables.
+
 ## 1.1.3
 
 ### Changed
