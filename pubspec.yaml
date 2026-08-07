@@ -17,6 +17,7 @@ dependencies:
   codemod_recipe: ^0.1.0
   dart_style: ^3.1.0     # 生成代码格式化 / Generated code formatting
   dio: ^5.10.0
+  intl: ^0.20.3
   mason: ^0.1.2
   mason_logger: ^0.3.5  # 彩色日志输出 / Colored console output
   path: ^1.9.1          # 路径操作 / Path manipulation
