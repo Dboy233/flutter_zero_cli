@@ -432,11 +432,41 @@ class Translations$versionCheck$zh {
 
 	// Translations
 
-	/// zh: '(缓存)已是最新版本。'
-	String get cacheLatest => '(缓存)已是最新版本。';
+	/// zh: '（缓存）已是最新版本。'
+	String get cacheLatest => '（缓存）已是最新版本。';
 
-	/// zh: '(pub.dev)已是最新版本。'
-	String get pubdevLatest => '(pub.dev)已是最新版本。';
+	/// zh: '（pub.dev）已是最新版本。'
+	String get pubdevLatest => '（pub.dev）已是最新版本。';
+
+	/// zh: '版本检查缓存已过期（$packageName），将重新获取'
+	String detailCacheExpired({required Object packageName}) => '版本检查缓存已过期（${packageName}），将重新获取';
+
+	/// zh: '版本检查缓存：$packageName 不可用'
+	String detailCacheUnavailable({required Object packageName}) => '版本检查缓存：${packageName} 不可用';
+
+	/// zh: '版本检查缓存：$packageName latest=$latest, hasUpdate=$hasUpdate'
+	String detailCacheHit({required Object packageName, required Object latest, required Object hasUpdate}) => '版本检查缓存：${packageName} latest=${latest}, hasUpdate=${hasUpdate}';
+
+	/// zh: '版本检查：使用 $packageName 的缓存结果'
+	String detailUsingCached({required Object packageName}) => '版本检查：使用 ${packageName} 的缓存结果';
+
+	/// zh: '正在 pub.dev 检查 $packageName 的更新…'
+	String detailCheckingPubdev({required Object packageName}) => '正在 pub.dev 检查 ${packageName} 的更新…';
+
+	/// zh: 'pub.dev 返回 $statusCode（$packageName），视为不可用'
+	String detailPubdevStatus({required Object statusCode, required Object packageName}) => 'pub.dev 返回 ${statusCode}（${packageName}），视为不可用';
+
+	/// zh: 'pub.dev：$packageName current=$current, latest=$latest, hasUpdate=$hasUpdate'
+	String detailPubdevResult({required Object packageName, required Object current, required Object latest, required Object hasUpdate}) => 'pub.dev：${packageName} current=${current}, latest=${latest}, hasUpdate=${hasUpdate}';
+
+	/// zh: '版本检查失败（$packageName）：$error'
+	String detailCheckFailed({required Object packageName, required Object error}) => '版本检查失败（${packageName}）：${error}';
+
+	/// zh: '缓存读取失败：$error'
+	String detailCacheReadFailed({required Object error}) => '缓存读取失败：${error}';
+
+	/// zh: '缓存写入失败：$error'
+	String detailCacheWriteFailed({required Object error}) => '缓存写入失败：${error}';
 }
 
 // Path: http
@@ -668,8 +698,18 @@ extension on Translations {
 			'template.registryMissingUrl' => ({required Object version}) => '模板版本 ${version} 在 registry 中缺少有效的 url 字段。',
 			'template.registryVersionNotFound' => ({required Object version}) => '当前模板 registry 未收录版本 ${version}，请确认该模板版本已发布，或升级 fluzer 到支持该模板的版本。',
 			'template.registryLocateFailed' => ({required Object version, required Object error}) => '定位模板版本 ${version} 的下载源失败：${error}',
-			'versionCheck.cacheLatest' => '(缓存)已是最新版本。',
-			'versionCheck.pubdevLatest' => '(pub.dev)已是最新版本。',
+			'versionCheck.cacheLatest' => '（缓存）已是最新版本。',
+			'versionCheck.pubdevLatest' => '（pub.dev）已是最新版本。',
+			'versionCheck.detailCacheExpired' => ({required Object packageName}) => '版本检查缓存已过期（${packageName}），将重新获取',
+			'versionCheck.detailCacheUnavailable' => ({required Object packageName}) => '版本检查缓存：${packageName} 不可用',
+			'versionCheck.detailCacheHit' => ({required Object packageName, required Object latest, required Object hasUpdate}) => '版本检查缓存：${packageName} latest=${latest}, hasUpdate=${hasUpdate}',
+			'versionCheck.detailUsingCached' => ({required Object packageName}) => '版本检查：使用 ${packageName} 的缓存结果',
+			'versionCheck.detailCheckingPubdev' => ({required Object packageName}) => '正在 pub.dev 检查 ${packageName} 的更新…',
+			'versionCheck.detailPubdevStatus' => ({required Object statusCode, required Object packageName}) => 'pub.dev 返回 ${statusCode}（${packageName}），视为不可用',
+			'versionCheck.detailPubdevResult' => ({required Object packageName, required Object current, required Object latest, required Object hasUpdate}) => 'pub.dev：${packageName} current=${current}, latest=${latest}, hasUpdate=${hasUpdate}',
+			'versionCheck.detailCheckFailed' => ({required Object packageName, required Object error}) => '版本检查失败（${packageName}）：${error}',
+			'versionCheck.detailCacheReadFailed' => ({required Object error}) => '缓存读取失败：${error}',
+			'versionCheck.detailCacheWriteFailed' => ({required Object error}) => '缓存写入失败：${error}',
 			'http.allRequestsFailed' => '所有候选地址（直连 + 镜像）请求均失败。',
 			'http.allDownloadsFailed' => '所有候选地址（直连 + 镜像）下载均失败。',
 			'http.requestFailed' => ({required Object url, required Object error}) => '候选地址请求失败：${url} (${error})',

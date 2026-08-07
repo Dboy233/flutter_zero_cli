@@ -29,7 +29,11 @@ class VersionCommand extends Command<int> {
   })  : _logger = logger ?? Logger(),
         _messages = messages ?? AppLocale.zh.buildSync(),
         _versionCheckService =
-            versionCheckService ?? VersionCheckService(logger: logger ?? Logger());
+            versionCheckService ??
+                VersionCheckService(
+                  logger: logger ?? Logger(),
+                  messages: messages ?? AppLocale.zh.buildSync(),
+                );
 
   final Logger _logger;
   final Translations _messages;

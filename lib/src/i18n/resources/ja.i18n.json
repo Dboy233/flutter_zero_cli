@@ -119,7 +119,17 @@
   },
   "versionCheck": {
     "cacheLatest": "（キャッシュ）最新バージョンです。",
-    "pubdevLatest": "（pub.dev）最新バージョンです。"
+    "pubdevLatest": "（pub.dev）最新バージョンです。",
+    "detailCacheExpired": "バージョン確認キャッシュの有効期限切れ（$packageName）、再取得します",
+    "detailCacheUnavailable": "バージョン確認キャッシュ：$packageName は利用不可",
+    "detailCacheHit": "バージョン確認キャッシュ：$packageName latest=$latest, hasUpdate=$hasUpdate",
+    "detailUsingCached": "バージョン確認：$packageName のキャッシュ結果を使用",
+    "detailCheckingPubdev": "pub.dev で $packageName の更新を確認中…",
+    "detailPubdevStatus": "pub.dev が $statusCode を返しました（$packageName）、利用不可と扱います",
+    "detailPubdevResult": "pub.dev：$packageName current=$current, latest=$latest, hasUpdate=$hasUpdate",
+    "detailCheckFailed": "バージョン確認失敗（$packageName）：$error",
+    "detailCacheReadFailed": "キャッシュ読み込み失敗：$error",
+    "detailCacheWriteFailed": "キャッシュ書き込み失敗：$error"
   },
   "http": {
     "allRequestsFailed": "すべての候補アドレス（直接 + ミラー）のリクエストが失敗しました。",

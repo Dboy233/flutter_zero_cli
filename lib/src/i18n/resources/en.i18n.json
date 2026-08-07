@@ -119,7 +119,17 @@
   },
   "versionCheck": {
     "cacheLatest": "(cache) Already up to date.",
-    "pubdevLatest": "(pub.dev) Already up to date."
+    "pubdevLatest": "(pub.dev) Already up to date.",
+    "detailCacheExpired": "Version check cache expired for $packageName, will re-fetch",
+    "detailCacheUnavailable": "Version check cache: $packageName unavailable",
+    "detailCacheHit": "Version check cache: $packageName latest=$latest, hasUpdate=$hasUpdate",
+    "detailUsingCached": "Version check: using cached result for $packageName",
+    "detailCheckingPubdev": "Checking updates for $packageName on pub.dev...",
+    "detailPubdevStatus": "pub.dev returned $statusCode for $packageName, treating as unavailable",
+    "detailPubdevResult": "pub.dev: $packageName current=$current, latest=$latest, hasUpdate=$hasUpdate",
+    "detailCheckFailed": "Version check failed for $packageName: $error",
+    "detailCacheReadFailed": "Cache read failed: $error",
+    "detailCacheWriteFailed": "Cache write failed: $error"
   },
   "http": {
     "allRequestsFailed": "All candidate addresses (direct + mirror) failed.",

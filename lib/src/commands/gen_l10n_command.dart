@@ -45,7 +45,10 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
        _messages = messages ?? AppLocale.zh.buildSync(),
        _versionCheckService =
            versionCheckService ??
-           VersionCheckService(logger: logger ?? Logger()),
+           VersionCheckService(
+             logger: logger ?? Logger(),
+             messages: messages ?? AppLocale.zh.buildSync(),
+           ),
        _processRunner = processRunner ?? ProcessRunner(),
        _patcher = patcher ?? const ToastHandlePatcher() {
     _flutterGenL10n = flutterGenL10nFn ?? _defaultFlutterGenL10n;
@@ -188,9 +191,7 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
           );
         },
       );
-      _logger.success(
-        _messages.genL10n.foundArbFiles(count: arbFiles.length),
-      );
+      _logger.success(_messages.genL10n.foundArbFiles(count: arbFiles.length));
 
       // 3. 执行 flutter gen-l10n
       final exitCode = await runWithSpinner(

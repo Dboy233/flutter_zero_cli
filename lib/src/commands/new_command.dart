@@ -55,7 +55,10 @@ class NewCommand extends Command<int> with VersionCheckMixin {
        _messages = messages ?? AppLocale.zh.buildSync(),
        _versionCheckService =
            versionCheckService ??
-           VersionCheckService(logger: logger ?? Logger()),
+           VersionCheckService(
+             logger: logger ?? Logger(),
+             messages: messages ?? AppLocale.zh.buildSync(),
+           ),
        _processRunner = processRunner ?? ProcessRunner() {
     _buildRunner = buildRunner ?? _defaultBuildRunner;
     argParser

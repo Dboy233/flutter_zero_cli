@@ -118,8 +118,18 @@
     "registryLocateFailed": "定位模板版本 $version 的下载源失败：$error"
   },
   "versionCheck": {
-    "cacheLatest": "(缓存)已是最新版本。",
-    "pubdevLatest": "(pub.dev)已是最新版本。"
+    "cacheLatest": "（缓存）已是最新版本。",
+    "pubdevLatest": "（pub.dev）已是最新版本。",
+    "detailCacheExpired": "版本检查缓存已过期（$packageName），将重新获取",
+    "detailCacheUnavailable": "版本检查缓存：$packageName 不可用",
+    "detailCacheHit": "版本检查缓存：$packageName latest=$latest, hasUpdate=$hasUpdate",
+    "detailUsingCached": "版本检查：使用 $packageName 的缓存结果",
+    "detailCheckingPubdev": "正在 pub.dev 检查 $packageName 的更新…",
+    "detailPubdevStatus": "pub.dev 返回 $statusCode（$packageName），视为不可用",
+    "detailPubdevResult": "pub.dev：$packageName current=$current, latest=$latest, hasUpdate=$hasUpdate",
+    "detailCheckFailed": "版本检查失败（$packageName）：$error",
+    "detailCacheReadFailed": "缓存读取失败：$error",
+    "detailCacheWriteFailed": "缓存写入失败：$error"
   },
   "http": {
     "allRequestsFailed": "所有候选地址（直连 + 镜像）请求均失败。",

@@ -11,6 +11,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:mason_logger/mason_logger.dart';
 
 import '../config/template_config.dart';
@@ -110,12 +111,17 @@ class VersionCacheEntry {
 /// [logger] and [dio] are constructor-injected (DIP); once constructed, every
 /// method has direct access to the shared dependencies.
 class VersionCheckService {
-  VersionCheckService({Logger? logger, Dio? dio})
-    : _logger = logger ?? Logger(),
-      _dio = dio ?? Dio();
+  VersionCheckService({
+    Logger? logger,
+    Dio? dio,
+    Translations? messages,
+  })  : _logger = logger ?? Logger(),
+        _dio = dio ?? Dio(),
+        _messages = messages ?? AppLocale.zh.buildSync();
 
   final Logger _logger;
   final Dio _dio;
+  final Translations _messages;
 
   // ---- 公共 API ----
 
@@ -133,12 +139,14 @@ class VersionCheckService {
         : _isRecentUnavailable(entry.checkedAt);
     if (stale) {
       _logger.detail(
-        'Version check cache expired for $packageName, will re-fetch',
+        _messages.versionCheck.detailCacheExpired(packageName: packageName),
       );
       return null;
     }
     if (!entry.available) {
-      _logger.detail('Version check cache: $packageName unavailable');
+      _logger.detail(
+        _messages.versionCheck.detailCacheUnavailable(packageName: packageName),
+      );
       return VersionCheckResult.unavailable(
         current: cliVersion,
         packageName: packageName,
@@ -148,7 +156,11 @@ class VersionCheckService {
     final hasUpdate =
         SemanticVersion.parse(latest) > SemanticVersion.parse(cliVersion);
     _logger.detail(
-      'Version check cache: $packageName latest=$latest, hasUpdate=$hasUpdate',
+      _messages.versionCheck.detailCacheHit(
+        packageName: packageName,
+        latest: latest,
+        hasUpdate: hasUpdate,
+      ),
     );
     return VersionCheckResult(
       current: cliVersion,
@@ -169,12 +181,16 @@ class VersionCheckService {
   }) async {
     final cached = peekCachedUpdate(packageName: packageName);
     if (cached != null) {
-      _logger.detail('Version check: using cached result for $packageName');
+      _logger.detail(
+        _messages.versionCheck.detailUsingCached(packageName: packageName),
+      );
       return cached;
     }
 
     try {
-      _logger.detail('Checking updates for $packageName on pub.dev...');
+      _logger.detail(
+        _messages.versionCheck.detailCheckingPubdev(packageName: packageName),
+      );
       final response = await _dio.get<dynamic>(
         'https://pub.dev/api/packages/$packageName',
         options: Options(
@@ -185,7 +201,10 @@ class VersionCheckService {
       );
       if (response.statusCode != 200) {
         _logger.detail(
-          'pub.dev returned ${response.statusCode} for $packageName, treating as unavailable',
+          _messages.versionCheck.detailPubdevStatus(
+            statusCode: response.statusCode ?? 0,
+            packageName: packageName,
+          ),
         );
         _writeCache(packageName, null);
         return VersionCheckResult.unavailable(
@@ -198,7 +217,12 @@ class VersionCheckService {
       final hasUpdate =
           SemanticVersion.parse(latest) > SemanticVersion.parse(cliVersion);
       _logger.detail(
-        'pub.dev: $packageName current=$cliVersion, latest=$latest, hasUpdate=$hasUpdate',
+        _messages.versionCheck.detailPubdevResult(
+          packageName: packageName,
+          current: cliVersion,
+          latest: latest,
+          hasUpdate: hasUpdate,
+        ),
       );
       _writeCache(packageName, latest);
       return VersionCheckResult(
@@ -208,7 +232,12 @@ class VersionCheckService {
         packageName: packageName,
       );
     } on Object catch (e) {
-      _logger.detail('Version check failed for $packageName: $e');
+      _logger.detail(
+        _messages.versionCheck.detailCheckFailed(
+          packageName: packageName,
+          error: e,
+        ),
+      );
       _writeCache(packageName, null);
       return VersionCheckResult.unavailable(
         current: cliVersion,
@@ -233,7 +262,7 @@ class VersionCheckService {
             MapEntry(k, VersionCacheEntry.fromJson(v as Map<String, dynamic>)),
       );
     } on Object catch (e) {
-      _logger.detail('Cache read failed: $e');
+      _logger.detail(_messages.versionCheck.detailCacheReadFailed(error: e));
       return {};
     }
   }
@@ -256,7 +285,7 @@ class VersionCheckService {
       }
       file.writeAsStringSync(jsonEncode(json));
     } on Object catch (e) {
-      _logger.detail('Cache write failed: $e');
+      _logger.detail(_messages.versionCheck.detailCacheWriteFailed(error: e));
     }
   }
 

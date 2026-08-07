@@ -227,6 +227,16 @@ class _Translations$versionCheck$ja implements Translations$versionCheck$zh {
 	// Translations
 	@override String get cacheLatest => '（キャッシュ）最新バージョンです。';
 	@override String get pubdevLatest => '（pub.dev）最新バージョンです。';
+	@override String detailCacheExpired({required Object packageName}) => 'バージョン確認キャッシュの有効期限切れ（${packageName}）、再取得します';
+	@override String detailCacheUnavailable({required Object packageName}) => 'バージョン確認キャッシュ：${packageName} は利用不可';
+	@override String detailCacheHit({required Object packageName, required Object latest, required Object hasUpdate}) => 'バージョン確認キャッシュ：${packageName} latest=${latest}, hasUpdate=${hasUpdate}';
+	@override String detailUsingCached({required Object packageName}) => 'バージョン確認：${packageName} のキャッシュ結果を使用';
+	@override String detailCheckingPubdev({required Object packageName}) => 'pub.dev で ${packageName} の更新を確認中…';
+	@override String detailPubdevStatus({required Object statusCode, required Object packageName}) => 'pub.dev が ${statusCode} を返しました（${packageName}）、利用不可と扱います';
+	@override String detailPubdevResult({required Object packageName, required Object current, required Object latest, required Object hasUpdate}) => 'pub.dev：${packageName} current=${current}, latest=${latest}, hasUpdate=${hasUpdate}';
+	@override String detailCheckFailed({required Object packageName, required Object error}) => 'バージョン確認失敗（${packageName}）：${error}';
+	@override String detailCacheReadFailed({required Object error}) => 'キャッシュ読み込み失敗：${error}';
+	@override String detailCacheWriteFailed({required Object error}) => 'キャッシュ書き込み失敗：${error}';
 }
 
 // Path: http
@@ -412,6 +422,16 @@ extension on TranslationsJa {
 			'template.registryLocateFailed' => ({required Object version, required Object error}) => 'テンプレートバージョン ${version} のダウンロード元の特定に失敗：${error}',
 			'versionCheck.cacheLatest' => '（キャッシュ）最新バージョンです。',
 			'versionCheck.pubdevLatest' => '（pub.dev）最新バージョンです。',
+			'versionCheck.detailCacheExpired' => ({required Object packageName}) => 'バージョン確認キャッシュの有効期限切れ（${packageName}）、再取得します',
+			'versionCheck.detailCacheUnavailable' => ({required Object packageName}) => 'バージョン確認キャッシュ：${packageName} は利用不可',
+			'versionCheck.detailCacheHit' => ({required Object packageName, required Object latest, required Object hasUpdate}) => 'バージョン確認キャッシュ：${packageName} latest=${latest}, hasUpdate=${hasUpdate}',
+			'versionCheck.detailUsingCached' => ({required Object packageName}) => 'バージョン確認：${packageName} のキャッシュ結果を使用',
+			'versionCheck.detailCheckingPubdev' => ({required Object packageName}) => 'pub.dev で ${packageName} の更新を確認中…',
+			'versionCheck.detailPubdevStatus' => ({required Object statusCode, required Object packageName}) => 'pub.dev が ${statusCode} を返しました（${packageName}）、利用不可と扱います',
+			'versionCheck.detailPubdevResult' => ({required Object packageName, required Object current, required Object latest, required Object hasUpdate}) => 'pub.dev：${packageName} current=${current}, latest=${latest}, hasUpdate=${hasUpdate}',
+			'versionCheck.detailCheckFailed' => ({required Object packageName, required Object error}) => 'バージョン確認失敗（${packageName}）：${error}',
+			'versionCheck.detailCacheReadFailed' => ({required Object error}) => 'キャッシュ読み込み失敗：${error}',
+			'versionCheck.detailCacheWriteFailed' => ({required Object error}) => 'キャッシュ書き込み失敗：${error}',
 			'http.allRequestsFailed' => 'すべての候補アドレス（直接 + ミラー）のリクエストが失敗しました。',
 			'http.allDownloadsFailed' => 'すべての候補アドレス（直接 + ミラー）のダウンロードが失敗しました。',
 			'http.requestFailed' => ({required Object url, required Object error}) => '候補アドレスのリクエストに失敗: ${url} (${error})',

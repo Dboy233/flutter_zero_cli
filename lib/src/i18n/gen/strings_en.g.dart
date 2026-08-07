@@ -227,6 +227,16 @@ class _Translations$versionCheck$en implements Translations$versionCheck$zh {
 	// Translations
 	@override String get cacheLatest => '(cache) Already up to date.';
 	@override String get pubdevLatest => '(pub.dev) Already up to date.';
+	@override String detailCacheExpired({required Object packageName}) => 'Version check cache expired for ${packageName}, will re-fetch';
+	@override String detailCacheUnavailable({required Object packageName}) => 'Version check cache: ${packageName} unavailable';
+	@override String detailCacheHit({required Object packageName, required Object latest, required Object hasUpdate}) => 'Version check cache: ${packageName} latest=${latest}, hasUpdate=${hasUpdate}';
+	@override String detailUsingCached({required Object packageName}) => 'Version check: using cached result for ${packageName}';
+	@override String detailCheckingPubdev({required Object packageName}) => 'Checking updates for ${packageName} on pub.dev...';
+	@override String detailPubdevStatus({required Object statusCode, required Object packageName}) => 'pub.dev returned ${statusCode} for ${packageName}, treating as unavailable';
+	@override String detailPubdevResult({required Object packageName, required Object current, required Object latest, required Object hasUpdate}) => 'pub.dev: ${packageName} current=${current}, latest=${latest}, hasUpdate=${hasUpdate}';
+	@override String detailCheckFailed({required Object packageName, required Object error}) => 'Version check failed for ${packageName}: ${error}';
+	@override String detailCacheReadFailed({required Object error}) => 'Cache read failed: ${error}';
+	@override String detailCacheWriteFailed({required Object error}) => 'Cache write failed: ${error}';
 }
 
 // Path: http
@@ -412,6 +422,16 @@ extension on TranslationsEn {
 			'template.registryLocateFailed' => ({required Object version, required Object error}) => 'Failed to locate download source for template version ${version}: ${error}',
 			'versionCheck.cacheLatest' => '(cache) Already up to date.',
 			'versionCheck.pubdevLatest' => '(pub.dev) Already up to date.',
+			'versionCheck.detailCacheExpired' => ({required Object packageName}) => 'Version check cache expired for ${packageName}, will re-fetch',
+			'versionCheck.detailCacheUnavailable' => ({required Object packageName}) => 'Version check cache: ${packageName} unavailable',
+			'versionCheck.detailCacheHit' => ({required Object packageName, required Object latest, required Object hasUpdate}) => 'Version check cache: ${packageName} latest=${latest}, hasUpdate=${hasUpdate}',
+			'versionCheck.detailUsingCached' => ({required Object packageName}) => 'Version check: using cached result for ${packageName}',
+			'versionCheck.detailCheckingPubdev' => ({required Object packageName}) => 'Checking updates for ${packageName} on pub.dev...',
+			'versionCheck.detailPubdevStatus' => ({required Object statusCode, required Object packageName}) => 'pub.dev returned ${statusCode} for ${packageName}, treating as unavailable',
+			'versionCheck.detailPubdevResult' => ({required Object packageName, required Object current, required Object latest, required Object hasUpdate}) => 'pub.dev: ${packageName} current=${current}, latest=${latest}, hasUpdate=${hasUpdate}',
+			'versionCheck.detailCheckFailed' => ({required Object packageName, required Object error}) => 'Version check failed for ${packageName}: ${error}',
+			'versionCheck.detailCacheReadFailed' => ({required Object error}) => 'Cache read failed: ${error}',
+			'versionCheck.detailCacheWriteFailed' => ({required Object error}) => 'Cache write failed: ${error}',
 			'http.allRequestsFailed' => 'All candidate addresses (direct + mirror) failed.',
 			'http.allDownloadsFailed' => 'All candidate addresses (direct + mirror) failed to download.',
 			'http.requestFailed' => ({required Object url, required Object error}) => 'Candidate request failed: ${url} (${error})',
