@@ -46,6 +46,7 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 	late final Translations$codemod$zh codemod = Translations$codemod$zh._(_root);
 	late final Translations$l10nParser$zh l10nParser = Translations$l10nParser$zh._(_root);
 	late final Translations$spinner$zh spinner = Translations$spinner$zh._(_root);
+	late final Translations$config$zh config = Translations$config$zh._(_root);
 }
 
 // Path: app
@@ -519,6 +520,42 @@ class Translations$spinner$zh {
 	String stepFailed({required Object label}) => '${label} 失败';
 }
 
+// Path: config
+class Translations$config$zh {
+	Translations$config$zh._(this._root);
+
+	final Translations _root; // ignore: unused_field
+
+	// Translations
+
+	/// zh: '未找到 $fileName，请确保在 flutter_zero 模板项目根目录下执行命令。'
+	String notFound({required Object fileName}) => '未找到 ${fileName}，请确保在 flutter_zero 模板项目根目录下执行命令。';
+
+	/// zh: '$fileName 格式错误：根节点必须是 Map。'
+	String rootNotMap({required Object fileName}) => '${fileName} 格式错误：根节点必须是 Map。';
+
+	/// zh: '$fileName 中缺少有效的 version 字段。'
+	String missingVersion({required Object fileName}) => '${fileName} 中缺少有效的 version 字段。';
+
+	/// zh: '模板版本 $version 过低，请使用 >= $minimumSupportedVersion 的项目模板。'
+	String versionTooOld({required Object version, required Object minimumSupportedVersion}) => '模板版本 ${version} 过低，请使用 >= ${minimumSupportedVersion} 的项目模板。';
+
+	/// zh: '$fileName 中 template_name 必须是 "flutter_zero"。'
+	String templateNameInvalid({required Object fileName}) => '${fileName} 中 template_name 必须是 "flutter_zero"。';
+
+	/// zh: '项目目录缺少 pubspec.yaml。'
+	String get missingPubspec => '项目目录缺少 pubspec.yaml。';
+
+	/// zh: 'pubspec.yaml 中缺少有效的 name 字段。'
+	String get missingPubspecName => 'pubspec.yaml 中缺少有效的 name 字段。';
+
+	/// zh: '项目目录缺少 lib/ 目录，无法识别为 Flutter 项目。'
+	String get missingLib => '项目目录缺少 lib/ 目录，无法识别为 Flutter 项目。';
+
+	/// zh: '未找到 lib/core/di/injection_base.dart，无法自动注册模块。'
+	String get missingInjectionBase => '未找到 lib/core/di/injection_base.dart，无法自动注册模块。';
+}
+
 /// The flat map containing all translations for locale <zh>.
 /// Only for edge cases! For simple maps, use the map function of this library.
 ///
@@ -648,6 +685,15 @@ extension on Translations {
 			'l10nParser.paramParseFailed' => ({required Object member, required Object param}) => '无法解析成员 ${member} 的参数声明: "${param}"。',
 			'spinner.stepCompleted' => ({required Object label}) => '${label} 完成',
 			'spinner.stepFailed' => ({required Object label}) => '${label} 失败',
+			'config.notFound' => ({required Object fileName}) => '未找到 ${fileName}，请确保在 flutter_zero 模板项目根目录下执行命令。',
+			'config.rootNotMap' => ({required Object fileName}) => '${fileName} 格式错误：根节点必须是 Map。',
+			'config.missingVersion' => ({required Object fileName}) => '${fileName} 中缺少有效的 version 字段。',
+			'config.versionTooOld' => ({required Object version, required Object minimumSupportedVersion}) => '模板版本 ${version} 过低，请使用 >= ${minimumSupportedVersion} 的项目模板。',
+			'config.templateNameInvalid' => ({required Object fileName}) => '${fileName} 中 template_name 必须是 "flutter_zero"。',
+			'config.missingPubspec' => '项目目录缺少 pubspec.yaml。',
+			'config.missingPubspecName' => 'pubspec.yaml 中缺少有效的 name 字段。',
+			'config.missingLib' => '项目目录缺少 lib/ 目录，无法识别为 Flutter 项目。',
+			'config.missingInjectionBase' => '未找到 lib/core/di/injection_base.dart，无法自动注册模块。',
 			_ => null,
 		};
 	}

@@ -143,5 +143,16 @@
   "spinner": {
     "stepCompleted": "$label 完了",
     "stepFailed": "$label 失敗"
+  },
+  "config": {
+    "notFound": "$fileName が見つかりません。flutter_zero テンプレートプロジェクトのルートディレクトリからコマンドを実行してください。",
+    "rootNotMap": "$fileName の形式が不正です：ルートノードは Map である必要があります。",
+    "missingVersion": "$fileName に有効な version フィールドがありません。",
+    "versionTooOld": "テンプレートバージョン $version が古すぎます。>= $minimumSupportedVersion のプロジェクトテンプレートを使用してください。",
+    "templateNameInvalid": "$fileName の template_name は \"flutter_zero\" である必要があります。",
+    "missingPubspec": "プロジェクトルートに pubspec.yaml がありません。",
+    "missingPubspecName": "pubspec.yaml に有効な name フィールドがありません。",
+    "missingLib": "プロジェクトルートに lib/ ディレクトリがありません。Flutter プロジェクトとして認識できません。",
+    "missingInjectionBase": "lib/core/di/injection_base.dart が見つかりません。モジュールの自動登録ができません。"
   }
 }

@@ -117,6 +117,12 @@ class ProcessRunner {
       runInShell: runInShell,
     );
 
+    // 关闭子进程 stdin：fluzer 为非交互 CLI，默认不向子进程转发终端输入。
+    // 若不关闭，stdin 管道写端会一直空闲；一旦子进程读取 stdin（如交互式
+    // 确认提示），会因永远等不到数据而静默挂死。关闭后子进程读到 EOF，
+    // 会走默认值 / 干净退出。
+    await process.stdin.close();
+
     // 直接透传原始字节（不经 SystemEncoding 逐字节解码），两流并发转发。
     // 用 forEach(outSink.add) 替代 pipe：同一 IOSink 被多个 pipe 绑定会抛
     // "StreamSink is bound to a stream"；forEach 内部以 add 写入，对共享 sink 安全。
@@ -147,6 +153,12 @@ class ProcessRunner {
       workingDirectory: workingDirectory,
       runInShell: runInShell,
     );
+    // 关闭子进程 stdin：fluzer 为非交互 CLI，默认不向子进程转发终端输入。
+    // 若不关闭，stdin 管道写端会一直空闲；一旦子进程读取 stdin（如交互式
+    // 确认提示），会因永远等不到数据而静默挂死。关闭后子进程读到 EOF，
+    // 会走默认值 / 干净退出。
+    await process.stdin.close();
+
     // 并发排空两个流并丢弃原始字节，避免管道背压导致子进程阻塞。
     final outDone = process.stdout.drain<void>();
     final errDone = process.stderr.drain<void>();

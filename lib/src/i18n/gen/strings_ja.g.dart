@@ -48,6 +48,7 @@ class TranslationsJa with BaseTranslations<AppLocale, Translations> implements T
 	@override late final _Translations$codemod$ja codemod = _Translations$codemod$ja._(_root);
 	@override late final _Translations$l10nParser$ja l10nParser = _Translations$l10nParser$ja._(_root);
 	@override late final _Translations$spinner$ja spinner = _Translations$spinner$ja._(_root);
+	@override late final _Translations$config$ja config = _Translations$config$ja._(_root);
 }
 
 // Path: app
@@ -279,6 +280,24 @@ class _Translations$spinner$ja implements Translations$spinner$zh {
 	@override String stepFailed({required Object label}) => '${label} 失敗';
 }
 
+// Path: config
+class _Translations$config$ja implements Translations$config$zh {
+	_Translations$config$ja._(this._root);
+
+	final TranslationsJa _root; // ignore: unused_field
+
+	// Translations
+	@override String notFound({required Object fileName}) => '${fileName} が見つかりません。flutter_zero テンプレートプロジェクトのルートディレクトリからコマンドを実行してください。';
+	@override String rootNotMap({required Object fileName}) => '${fileName} の形式が不正です：ルートノードは Map である必要があります。';
+	@override String missingVersion({required Object fileName}) => '${fileName} に有効な version フィールドがありません。';
+	@override String versionTooOld({required Object version, required Object minimumSupportedVersion}) => 'テンプレートバージョン ${version} が古すぎます。>= ${minimumSupportedVersion} のプロジェクトテンプレートを使用してください。';
+	@override String templateNameInvalid({required Object fileName}) => '${fileName} の template_name は "flutter_zero" である必要があります。';
+	@override String get missingPubspec => 'プロジェクトルートに pubspec.yaml がありません。';
+	@override String get missingPubspecName => 'pubspec.yaml に有効な name フィールドがありません。';
+	@override String get missingLib => 'プロジェクトルートに lib/ ディレクトリがありません。Flutter プロジェクトとして認識できません。';
+	@override String get missingInjectionBase => 'lib/core/di/injection_base.dart が見つかりません。モジュールの自動登録ができません。';
+}
+
 /// The flat map containing all translations for locale <ja>.
 /// Only for edge cases! For simple maps, use the map function of this library.
 ///
@@ -408,6 +427,15 @@ extension on TranslationsJa {
 			'l10nParser.paramParseFailed' => ({required Object member, required Object param}) => 'メンバー ${member} のパラメータ宣言を解析できません: "${param}"。',
 			'spinner.stepCompleted' => ({required Object label}) => '${label} 完了',
 			'spinner.stepFailed' => ({required Object label}) => '${label} 失敗',
+			'config.notFound' => ({required Object fileName}) => '${fileName} が見つかりません。flutter_zero テンプレートプロジェクトのルートディレクトリからコマンドを実行してください。',
+			'config.rootNotMap' => ({required Object fileName}) => '${fileName} の形式が不正です：ルートノードは Map である必要があります。',
+			'config.missingVersion' => ({required Object fileName}) => '${fileName} に有効な version フィールドがありません。',
+			'config.versionTooOld' => ({required Object version, required Object minimumSupportedVersion}) => 'テンプレートバージョン ${version} が古すぎます。>= ${minimumSupportedVersion} のプロジェクトテンプレートを使用してください。',
+			'config.templateNameInvalid' => ({required Object fileName}) => '${fileName} の template_name は "flutter_zero" である必要があります。',
+			'config.missingPubspec' => 'プロジェクトルートに pubspec.yaml がありません。',
+			'config.missingPubspecName' => 'pubspec.yaml に有効な name フィールドがありません。',
+			'config.missingLib' => 'プロジェクトルートに lib/ ディレクトリがありません。Flutter プロジェクトとして認識できません。',
+			'config.missingInjectionBase' => 'lib/core/di/injection_base.dart が見つかりません。モジュールの自動登録ができません。',
 			_ => null,
 		};
 	}

@@ -137,7 +137,10 @@ class NewCommand extends Command<int> with VersionCheckMixin {
         messages: _messages,
         message: _messages.feature.step1Load,
         work: () async {
-          config = await ProjectConfig.load(start: workingDirectory);
+          config = await ProjectConfig.load(
+            start: workingDirectory,
+            messages: _messages,
+          );
           _logger.detail(
             _messages.feature.detailProjectRoot(path: config.projectRoot),
           );

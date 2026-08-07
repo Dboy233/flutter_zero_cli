@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:path/path.dart' as path;
 import 'package:yaml/yaml.dart';
 
@@ -79,21 +80,23 @@ class ProjectConfig {
   /// 查找并加载项目配置。
   ///
   /// [start] 为向上查找的起始目录，默认当前工作目录；测试可注入临时目录。
+  /// [messages] 为本地化消息（默认中文），用于异常提示国际化。
   /// 返回配置；失败时抛出 [CliException]。
   ///
   ///
   /// Locates and loads the project configuration.
   ///
   /// [start] is the directory to walk up from (defaults to cwd).
-  /// Returns the config or throws [CliException] on failure.
-  static Future<ProjectConfig> load({Directory? start}) async {
+  /// [messages] are the localized messages (defaults to Chinese) used for
+  /// exception messages. Returns the config or throws [CliException].
+  static Future<ProjectConfig> load({
+    Directory? start,
+    Translations? messages,
+  }) async {
+    final m = messages ?? AppLocale.zh.buildSync();
     final root = await _findProjectRoot(start ?? Directory.current);
     if (root == null) {
-      throw CliException(
-        '未找到 $fileName，请确保在 flutter_zero 模板项目根目录下执行命令。\n'
-        'Could not find $fileName. Make sure you run this command from a '
-        'flutter_zero template project root.',
-      );
+      throw CliException(m.config.notFound(fileName: fileName));
     }
 
     final configFile = File(path.join(root.path, fileName));
@@ -101,18 +104,12 @@ class ProjectConfig {
     final yaml = loadYaml(raw);
 
     if (yaml is! Map) {
-      throw CliException(
-        '$fileName 格式错误：根节点必须是 Map。\n'
-        'Invalid $fileName: root must be a Map.',
-      );
+      throw CliException(m.config.rootNotMap(fileName: fileName));
     }
 
     final version = yaml['version'];
     if (version is! String || version.isEmpty) {
-      throw CliException(
-        '$fileName 中缺少有效的 version 字段。\n'
-        'Missing valid "version" field in $fileName.',
-      );
+      throw CliException(m.config.missingVersion(fileName: fileName));
     }
 
     // minCliVersion 为可选字段：老项目可能未写入，默认 "0.0.0"（兼容任意 CLI）。
@@ -124,53 +121,39 @@ class ProjectConfig {
     if (SemanticVersion.parse(version) <
         SemanticVersion.parse(minimumSupportedVersion)) {
       throw CliException(
-        '模板版本 $version 过低，请使用 >= $minimumSupportedVersion 的项目模板。\n'
-        'Template version $version is too old. '
-        'Please use a project template >= $minimumSupportedVersion.',
+        m.config.versionTooOld(
+          version: version,
+          minimumSupportedVersion: minimumSupportedVersion,
+        ),
       );
     }
 
     final templateName = yaml['template_name'];
     if (templateName is! String || templateName != 'flutter_zero') {
-      throw CliException(
-        '$fileName 中 template_name 必须是 "flutter_zero"。\n'
-        'The "template_name" field in $fileName must be "flutter_zero".',
-      );
+      throw CliException(m.config.templateNameInvalid(fileName: fileName));
     }
 
     // 额外校验项目结构是否存在
     final pubspecFile = File(path.join(root.path, 'pubspec.yaml'));
     if (!await pubspecFile.exists()) {
-      throw CliException(
-        '项目目录缺少 pubspec.yaml。\n'
-        'Missing pubspec.yaml in project root.',
-      );
+      throw CliException(m.config.missingPubspec);
     }
     final pubspecYaml = loadYaml(await pubspecFile.readAsString());
     final packageName = pubspecYaml['name'];
     if (packageName is! String || packageName.isEmpty) {
-      throw CliException(
-        'pubspec.yaml 中缺少有效的 name 字段。\n'
-        'Missing valid "name" field in pubspec.yaml.',
-      );
+      throw CliException(m.config.missingPubspecName);
     }
 
     final libDir = Directory(path.join(root.path, 'lib'));
     if (!await libDir.exists()) {
-      throw CliException(
-        '项目目录缺少 lib/ 目录，无法识别为 Flutter 项目。\n'
-        'Missing lib/ directory in project root.',
-      );
+      throw CliException(m.config.missingLib);
     }
 
     final injectionBase = File(
       path.join(root.path, 'lib', 'core', 'di', 'injection_base.dart'),
     );
     if (!await injectionBase.exists()) {
-      throw CliException(
-        '未找到 lib/core/di/injection_base.dart，无法自动注册模块。\n'
-        'Could not find lib/core/di/injection_base.dart.',
-      );
+      throw CliException(m.config.missingInjectionBase);
     }
 
     return ProjectConfig(

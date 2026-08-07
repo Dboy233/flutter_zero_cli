@@ -3,10 +3,12 @@
 ### Added
 
 - Terminal CLI is now localized: Chinese (zh), English (en) and Japanese (ja) are supported. A new global `--locale`/`-L` flag selects the UI language; when omitted, it follows the system locale or environment variables.
+- Configuration-validation error messages emitted by the `new` and `gen-l10n` commands are now localized (zh/en/ja) instead of hardcoded mixed-language text.
 
 ### Changed
 
 - Subprocess output is now drained concurrently for both stdout and stderr. This eliminates a pipe-backpressure stall that made child commands (notably `build_runner` during `new`) extremely slow when run without `--log`.
+- Subprocesses now start with their standard input closed by default, so a child command that waits for interactive input (such as a confirmation prompt) no longer hangs silently and instead proceeds with its default behavior.
 
 ## 1.1.3
 

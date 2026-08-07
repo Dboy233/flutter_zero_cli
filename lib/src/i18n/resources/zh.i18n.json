@@ -143,5 +143,16 @@
   "spinner": {
     "stepCompleted": "$label 完成",
     "stepFailed": "$label 失败"
+  },
+  "config": {
+    "notFound": "未找到 $fileName，请确保在 flutter_zero 模板项目根目录下执行命令。",
+    "rootNotMap": "$fileName 格式错误：根节点必须是 Map。",
+    "missingVersion": "$fileName 中缺少有效的 version 字段。",
+    "versionTooOld": "模板版本 $version 过低，请使用 >= $minimumSupportedVersion 的项目模板。",
+    "templateNameInvalid": "$fileName 中 template_name 必须是 \"flutter_zero\"。",
+    "missingPubspec": "项目目录缺少 pubspec.yaml。",
+    "missingPubspecName": "pubspec.yaml 中缺少有效的 name 字段。",
+    "missingLib": "项目目录缺少 lib/ 目录，无法识别为 Flutter 项目。",
+    "missingInjectionBase": "未找到 lib/core/di/injection_base.dart，无法自动注册模块。"
   }
 }

@@ -48,6 +48,7 @@ class TranslationsEn with BaseTranslations<AppLocale, Translations> implements T
 	@override late final _Translations$codemod$en codemod = _Translations$codemod$en._(_root);
 	@override late final _Translations$l10nParser$en l10nParser = _Translations$l10nParser$en._(_root);
 	@override late final _Translations$spinner$en spinner = _Translations$spinner$en._(_root);
+	@override late final _Translations$config$en config = _Translations$config$en._(_root);
 }
 
 // Path: app
@@ -279,6 +280,24 @@ class _Translations$spinner$en implements Translations$spinner$zh {
 	@override String stepFailed({required Object label}) => '${label} failed';
 }
 
+// Path: config
+class _Translations$config$en implements Translations$config$zh {
+	_Translations$config$en._(this._root);
+
+	final TranslationsEn _root; // ignore: unused_field
+
+	// Translations
+	@override String notFound({required Object fileName}) => 'Could not find ${fileName}. Make sure you run this command from a flutter_zero template project root.';
+	@override String rootNotMap({required Object fileName}) => 'Invalid ${fileName}: root must be a Map.';
+	@override String missingVersion({required Object fileName}) => 'Missing valid "version" field in ${fileName}.';
+	@override String versionTooOld({required Object version, required Object minimumSupportedVersion}) => 'Template version ${version} is too old. Please use a project template >= ${minimumSupportedVersion}.';
+	@override String templateNameInvalid({required Object fileName}) => 'The "template_name" field in ${fileName} must be "flutter_zero".';
+	@override String get missingPubspec => 'Missing pubspec.yaml in project root.';
+	@override String get missingPubspecName => 'Missing valid "name" field in pubspec.yaml.';
+	@override String get missingLib => 'Missing lib/ directory in project root. Not a recognized Flutter project.';
+	@override String get missingInjectionBase => 'Could not find lib/core/di/injection_base.dart. Automatic module registration is unavailable.';
+}
+
 /// The flat map containing all translations for locale <en>.
 /// Only for edge cases! For simple maps, use the map function of this library.
 ///
@@ -408,6 +427,15 @@ extension on TranslationsEn {
 			'l10nParser.paramParseFailed' => ({required Object param, required Object member}) => 'Unable to parse parameter "${param}" of member "${member}".',
 			'spinner.stepCompleted' => ({required Object label}) => '${label} completed',
 			'spinner.stepFailed' => ({required Object label}) => '${label} failed',
+			'config.notFound' => ({required Object fileName}) => 'Could not find ${fileName}. Make sure you run this command from a flutter_zero template project root.',
+			'config.rootNotMap' => ({required Object fileName}) => 'Invalid ${fileName}: root must be a Map.',
+			'config.missingVersion' => ({required Object fileName}) => 'Missing valid "version" field in ${fileName}.',
+			'config.versionTooOld' => ({required Object version, required Object minimumSupportedVersion}) => 'Template version ${version} is too old. Please use a project template >= ${minimumSupportedVersion}.',
+			'config.templateNameInvalid' => ({required Object fileName}) => 'The "template_name" field in ${fileName} must be "flutter_zero".',
+			'config.missingPubspec' => 'Missing pubspec.yaml in project root.',
+			'config.missingPubspecName' => 'Missing valid "name" field in pubspec.yaml.',
+			'config.missingLib' => 'Missing lib/ directory in project root. Not a recognized Flutter project.',
+			'config.missingInjectionBase' => 'Could not find lib/core/di/injection_base.dart. Automatic module registration is unavailable.',
 			_ => null,
 		};
 	}

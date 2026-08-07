@@ -143,5 +143,16 @@
   "spinner": {
     "stepCompleted": "$label completed",
     "stepFailed": "$label failed"
+  },
+  "config": {
+    "notFound": "Could not find $fileName. Make sure you run this command from a flutter_zero template project root.",
+    "rootNotMap": "Invalid $fileName: root must be a Map.",
+    "missingVersion": "Missing valid \"version\" field in $fileName.",
+    "versionTooOld": "Template version $version is too old. Please use a project template >= $minimumSupportedVersion.",
+    "templateNameInvalid": "The \"template_name\" field in $fileName must be \"flutter_zero\".",
+    "missingPubspec": "Missing pubspec.yaml in project root.",
+    "missingPubspecName": "Missing valid \"name\" field in pubspec.yaml.",
+    "missingLib": "Missing lib/ directory in project root. Not a recognized Flutter project.",
+    "missingInjectionBase": "Could not find lib/core/di/injection_base.dart. Automatic module registration is unavailable."
   }
 }

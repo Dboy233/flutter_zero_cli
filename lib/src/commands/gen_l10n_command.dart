@@ -134,7 +134,10 @@ class GenL10nCommand extends Command<int> with VersionCheckMixin {
         messages: _messages,
         message: _messages.genL10n.step1Validate,
         work: () async {
-          config = await ProjectConfig.load(start: workingDirectory);
+          config = await ProjectConfig.load(
+            start: workingDirectory,
+            messages: _messages,
+          );
           projectRoot = config.projectRoot;
           // 版本门禁：gen-l10n 不下载模板，门禁通过即继续执行。
           if (!(argResults!['skip-version-check'] as bool) &&
