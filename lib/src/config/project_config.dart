@@ -198,3 +198,23 @@ class CliException implements Exception {
   @override
   String toString() => message;
 }
+
+/// 目标目录已存在异常。
+///
+/// 由 `create` 在目标目录已存在时抛出。该目录**不是本次命令创建的**，
+/// 属于用户既有数据，捕获方必须直接报错返回，**不得执行任何清理/删除**。
+///
+/// 因此它与普通 [CliException] 的区别不只是「失败原因」，
+/// 更决定了失败后能否清理目标目录，捕获时务必单独处理。
+///
+/// Thrown by `create` when the target directory already exists.
+///
+/// The directory was **not created by this run** and belongs to the user, so
+/// handlers must report the error and return without performing any
+/// cleanup/deletion.
+class DirExistsException extends CliException {
+  /// 创建异常。
+  ///
+  /// Creates the exception.
+  const DirExistsException(super.message);
+}

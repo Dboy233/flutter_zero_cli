@@ -176,9 +176,15 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
           _logger.detail(
             _messages.create.detailProject(name: projectName, org: org),
           );
-          // 检查目标目录是否已存在
+          // 检查目标目录是否已存在。
+          // 此处必须抛 DirExistsException 而非 CliException：
+          // 该目录是用户既有数据，捕获方据此跳过清理，绝不删除它。
+          // 后续若新增「跳过存在性检查」的选项（如 --force），
+          // 需同步确认清理路径不会误删用户原有目录。
           if (Directory(targetDir).existsSync()) {
-            throw CliException(_messages.create.dirExists(name: projectName));
+            throw DirExistsException(
+              _messages.create.dirExists(name: projectName),
+            );
           }
         },
       );
@@ -231,9 +237,14 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
 
       _done(targetDir, projectName);
       return 0;
+    } on DirExistsException catch (e) {
+      // 目标目录是用户既有数据，不属于本次命令创建：只报错，绝不清理。
+      // 该 catch 必须位于 CliException 之前，否则会被父类分支吞掉。
+      _logger.err(e.message);
+      return 1;
     } on CliException catch (e) {
       _logger.err(e.message);
-      // 清理失败的目录
+      // 清理本次命令创建的半成品目录
       _cleanupOnFailure(targetDir);
       return 1;
     } on ProcessException catch (e) {
@@ -313,9 +324,18 @@ class CreateCommand extends Command<int> with VersionCheckMixin {
     }
   }
 
-  /// 创建失败时清理目标目录。
+  /// 删除 [targetDir]（目录不存在时静默跳过，删除失败只记日志不抛出）。
   ///
-  /// Cleans up the target directory on failure.
+  /// 职责单一：只做删除，不判断该不该删。
+  /// **是否有权删除由调用方决定** —— 仅当目录确认为本次命令创建的半成品时
+  /// 才可调用；用户既有目录的场景由 [DirExistsException] 分支拦截，不会走到这里。
+  ///
+  /// Deletes [targetDir] (silently skips when absent, logs deletion failures).
+  ///
+  /// Single responsibility: it only deletes and never decides whether deletion
+  /// is allowed. Callers must ensure the directory was created by this run;
+  /// pre-existing user directories are handled by the [DirExistsException]
+  /// branch and never reach this method.
   void _cleanupOnFailure(String targetDir) {
     final dir = Directory(targetDir);
     if (dir.existsSync()) {

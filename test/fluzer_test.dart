@@ -408,17 +408,32 @@ void main() {
         expect(code, 1);
       });
 
-      test('目标目录已存在 → 返回 1 / existing target dir returns 1', () async {
-        Directory(path.join(sandbox.path, 'existing_app')).createSync();
-        final code = await runnerWith(
-          CreateCommand(
-            workingDirectory: sandbox,
-            versionCheckService: _noopVersionCheckService,
-          ),
-        )
-            .run(['create', 'existing_app']);
-        expect(code, 1);
-      });
+      test(
+        '目标目录已存在 → 返回 1 且不删除原目录 / '
+        'existing target dir returns 1 and keeps it untouched',
+        () async {
+          final existingDir =
+              Directory(path.join(sandbox.path, 'existing_app'));
+          existingDir.createSync();
+          // 原目录中已有的文件应完好无损
+          final sentinel =
+              File(path.join(existingDir.path, 'my_precious.txt'));
+          await sentinel.writeAsString('do-not-delete');
+
+          final code = await runnerWith(
+            CreateCommand(
+              workingDirectory: sandbox,
+              versionCheckService: _noopVersionCheckService,
+            ),
+          ).run(['create', 'existing_app']);
+
+          expect(code, 1);
+          // 关键回归：原目录及其内容必须保留，绝不可被递归删除
+          expect(existingDir.existsSync(), isTrue);
+          expect(sentinel.existsSync(), isTrue);
+          expect(await sentinel.readAsString(), 'do-not-delete');
+        },
+      );
 
       test(
         '完整流程（注入运行时）→ 返回 0 并生成项目 / full flow returns 0',

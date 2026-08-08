@@ -1,3 +1,9 @@
+## 1.2.1
+
+### Fixed
+
+- `create` no longer removes an existing directory that has the same name as the project being created. Previously the command reported the name conflict and then recursively deleted that directory together with all of its contents. It now reports the error and exits without touching your files. Cleaning up a half-created project still happens when a later step of `create` fails.
+
 ## 1.2.0
 
 ### Added
