@@ -45,12 +45,11 @@ class StepRunner {
     _entries.add(
       _StepEntry(
         message: message,
-        // 闭包内消费 [work] 的返回值并交给 [onDone]，无需类型擦除，
-        // [void] 步骤（T = void）天然兼容。
-        run: () async {
-          final result = await work();
-          onDone?.call(result);
-        },
+        // 仅执行 [work] 并保留返回值（类型擦除为 dynamic）；[onDone] 的调用
+        // 推迟到 [runAll] 中 [SpinnerRunner] 收尾之后再执行，避免破坏 spinner
+        // 动画行（符合本类文档契约）。
+        run: () async => work(),
+        onDone: onDone == null ? null : (dynamic r) => onDone(r as T),
       ),
     );
   }
@@ -60,19 +59,28 @@ class StepRunner {
     final total = _entries.length;
     for (var i = 0; i < _entries.length; i++) {
       final entry = _entries[i];
-      await SpinnerRunner(logger: logger, translations: translations).run(
-        message:
-            '${translations.spinner.stepLabel(index: i + 1, total: total)} '
-            '${entry.message}',
-        work: entry.run,
-      );
+      final result = await SpinnerRunner(logger: logger, translations: translations)
+          .run(
+            message:
+                '${translations.spinner.stepLabel(index: i + 1, total: total)} '
+                '${entry.message}',
+            work: entry.run,
+          );
+      // [SpinnerRunner] 已收尾 spinner，此刻调用 [onDone] 不会破坏动画行。
+      try {
+        entry.onDone?.call(result);
+      } on Object catch (e, st) {
+        // [onDone] 仅为步骤间总结日志，其异常不应拖累已成功的步骤。
+        logger.detail('onDone 执行失败（不阻断流程）: $e\n$st');
+      }
     }
   }
 }
 
 class _StepEntry {
-  const _StepEntry({required this.message, required this.run});
+  const _StepEntry({required this.message, required this.run, this.onDone});
 
   final String message;
-  final Future<void> Function() run;
+  final Future<dynamic> Function() run;
+  final void Function(dynamic)? onDone;
 }
