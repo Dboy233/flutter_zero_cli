@@ -66,7 +66,7 @@ class TemplateVersionReader {
     if (configFile == null) {
       throw CliException(
         translations.config.notFound(
-          fileName: ProjectConfig.fileNames.join('or'),
+          fileName: ProjectConfig.fileNames.join(' or '),
         ),
       );
     }

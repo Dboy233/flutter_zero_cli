@@ -6,14 +6,17 @@
 // 解析优先级（Priority）：
 // 1. `FLUZER_BRICKS_DIR` 非空 → [LocalBrickLoader]（本地开发 / 调试）；
 // 2. `FLUZER_TEMPLATE_ZIP_URL` 非空 → 强制使用该 URL 的 [RemoteBrickLoader]（测试 / 调试）；
-// 3. 否则远程：从 [templateRegistryUrl] 拉取 registry，按 CLI 版本
-//    （[cliVersion]）选出 `minCliVersion <= cliVersion` 中 `version` 最大者的
-//    zip URL；拉取失败则回退 [defaultTemplateZipUrl]。
+// 3. 否则远程：根据调用方意图从 [templateRegistryUrl] 选模板——
+//    - `create`（[resolve] 的 [pinnedVersion] 为 null）：取 `templates` 中
+//      `version` 最大者的 zip URL（始终使用最新模板）；
+//    - `new` 等（[pinnedVersion] 非空）：按项目模板版本号钉死，选精确匹配者
+//      （见 [selectExact]）；
+//    拉取失败或找不到时回退 [defaultTemplateZipUrl] / 抛出 [CliException]。
 //
 // 发布说明（Publishing）：
 // - 发布前请将 [templateRegistryUrl] 与 [defaultTemplateZipUrl] 替换为真实地址。
-// - registry 采用"兼容性桶"结构：每条记录代表一个 `minCliVersion` 级别下的最新
-//   模板快照；模板发 PATCH/MINOR 只更新该记录的 `version`/`url`，发 MAJOR 才新增记录。
+// - registry 的 `templates` 为模板版本列表，每条含 `version` 与 `url`；
+//   `create` 取其中 `version` 最大者，`new` 按其精确 `version` 选取。
 //   详见 `flutter_zero_template/template_registry.json` 与 `VERSIONING_CLI.md`。
 
 import 'dart:convert';
@@ -56,7 +59,7 @@ class TemplateSourceResolver {
   /// 解析当前应使用的 [BrickLoader]（详见文件头优先级说明）。
   ///
   /// [pinnedVersion] 非空时按精确版本钉死下载源（用于 `new`），
-  /// 为 `null` 时按 CLI 版本选最新兼容版本（用于 `create`）。
+  /// 为 `null` 时取 `templates` 中 `version` 最大者（用于 `create`）。
   Future<BrickLoader> resolve({String? pinnedVersion}) async {
     // 1. 本地开发 / 调试：显式指定本地 bricks 目录时优先使用。
     final bricksDir = Platform.environment['FLUZER_BRICKS_DIR'];
@@ -105,12 +108,12 @@ class TemplateSourceResolver {
     );
   }
 
-  /// 从 registry 选出版本兼容的模板 zip URL 及其版本号。
+  /// 从 registry 选出 `version` 最大的模板 zip URL 及其版本号（用于 `create`）。
   ///
-  /// 遍历 `templates`，在所有 `minCliVersion <= [cliVersion]` 的记录中，
-  /// 选取 `version` 最大者的 `url` 与 `version`；无匹配或拉取失败时回退
-  /// [defaultTemplateZipUrl]，版本号从默认 URL 中提取。registry 返回内容
-  /// 无法解析时 `version` 为 `null`，由 [resolve] 统一抛出 [CliException]。
+  /// 遍历 `templates`，在全部记录中取 `version` 最大者的 `url` 与 `version`；
+  /// 列表为空或拉取失败时回退 [defaultTemplateZipUrl]，版本号从默认 URL 中提取。
+  /// registry 返回内容无法解析时 `version` 为 `null`，由 [resolve] 统一抛出
+  /// [CliException]。
   Future<({String url, String? version})> selectLatest({
     String registryUrl = templateRegistryUrl,
   }) async {
@@ -129,10 +132,6 @@ class TemplateSourceResolver {
       SemanticVersion? bestVersion;
       for (final item in templates) {
         final t = item as Map<String, dynamic>;
-        final minCli = SemanticVersion.parse(
-          t['minCliVersion'] as String? ?? '0.0.0',
-        );
-        if (minCli > SemanticVersion.parse(cliVersion)) continue;
         final version = SemanticVersion.parse(
           t['version'] as String? ?? '0.0.0',
         );

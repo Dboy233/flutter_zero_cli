@@ -5,7 +5,7 @@
 /// 极简语义化版本。
 ///
 /// 只比较 `major.minor.patch` 的数值，忽略 pre-release 与 build 元数据。
-/// 用于 CLI 与模板之间的兼容性比较（如 `minCliVersion <= cliVersion`）。
+/// 用于模板版本之间的比较（如 `create` 取 `version` 最大者、按精确 `version` 钉死下载源）。
 class SemanticVersion implements Comparable<SemanticVersion> {
   const SemanticVersion(this.major, this.minor, this.patch);
 

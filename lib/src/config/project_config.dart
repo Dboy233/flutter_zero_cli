@@ -93,7 +93,7 @@ class ProjectConfig {
     final m = messages ?? AppLocale.zh.buildSync();
     final configFile = await findConfigFile(start ?? Directory.current);
     if (configFile == null) {
-      throw CliException(m.config.notFound(fileName: fileNames.join('or')));
+      throw CliException(m.config.notFound(fileName: fileNames.join(' or ')));
     }
     final root = configFile.parent;
 
@@ -101,7 +101,7 @@ class ProjectConfig {
     final yaml = loadYaml(raw);
 
     if (yaml is! Map) {
-      throw CliException(m.config.rootNotMap(fileName: fileNames.join('or')));
+      throw CliException(m.config.rootNotMap(fileName: fileNames.join(' or ')));
     }
 
     final fileName = path.basename(configFile.path);

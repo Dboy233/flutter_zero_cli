@@ -25,8 +25,8 @@ Future<(HttpServer, String)> _startRegistryServer(String registryJson) async {
 const _twoVersions = '''
 {
   "templates": [
-    {"minCliVersion": "1.0.0", "version": "1.0.0", "url": "https://x/1.0.0.zip"},
-    {"minCliVersion": "1.1.0", "version": "1.0.1", "url": "https://x/1.0.1.zip"}
+    {"version": "1.0.0", "url": "https://x/1.0.0.zip"},
+    {"version": "1.0.1", "url": "https://x/1.0.1.zip"}
   ]
 }''';
 
@@ -43,15 +43,15 @@ void main() {
 
   tearDown(() => server.close(force: true));
 
-  group('selectTemplateZipUrl (按 CLI 版本选最大兼容)', () {
+  group('selectLatest (create 取 version 最大者)', () {
     setUp(() async {
       final r = await _startRegistryServer(_twoVersions);
       server = r.$1;
       registryUrl = r.$2;
     });
 
-    test('cliVersion 1.1.0 时选 version 最大且兼容者 (1.0.1)', () async {
-      // cliVersion 为常量 '1.1.0'，两条均 <= 1.1.0，取最大 version。
+    test('create 取 version 最大者 (1.0.1)', () async {
+      // 不再受 minCliVersion 约束：遍历全部条目，取 version 最大者。
       final result = await resolver.selectLatest(registryUrl: registryUrl);
       expect(result.version, '1.0.1');
       expect(result.url, 'https://x/1.0.1.zip');
@@ -71,11 +71,8 @@ void main() {
       expect(result.url, defaultTemplateZipUrl);
     });
 
-    test('无兼容条目 → 回退 defaultTemplateZipUrl', () async {
-      final r = await _startRegistryServer('''
-      {"templates": [
-        {"minCliVersion": "9.9.9", "version": "9.9.9", "url": "https://x/9.9.9.zip"}
-      ]}''');
+    test('registry 无模板条目 → 回退 defaultTemplateZipUrl', () async {
+      final r = await _startRegistryServer('{"templates": []}');
       await server.close(force: true);
       server = r.$1;
       final result = await resolver.selectLatest(registryUrl: r.$2);
@@ -109,7 +106,7 @@ void main() {
     test('命中但 url 缺失 → 抛 CliException', () async {
       final r = await _startRegistryServer('''
       {"templates": [
-        {"minCliVersion": "1.0.0", "version": "1.0.0"}
+        {"version": "1.0.0"}
       ]}''');
       await server.close(force: true);
       server = r.$1;
