@@ -212,6 +212,8 @@ class _Translations$template$ja implements Translations$template$zh {
 	@override String registryMissingUrl({required Object version}) => 'テンプレートバージョン ${version} は registry に有効な url フィールドがありません。';
 	@override String registryVersionNotFound({required Object version}) => '現在のテンプレート registry にバージョン ${version} が登録されていません。そのテンプレートバージョンが公開されているか、またはこのテンプレートをサポートする fluzer にアップグレードしてください。';
 	@override String registryLocateFailed({required Object version, required Object error}) => 'テンプレートバージョン ${version} のダウンロード元の特定に失敗：${error}';
+	@override String zipUrlMissingVersion({required Object url}) => '環境変数 FLUZER_TEMPLATE_ZIP_URL のテンプレート URL からバージョンを特定できません: ${url}\nURL には 1.2.3 のようなバージョンが含まれている必要があります（例: .../1.0.0/bricks.zip）。';
+	@override String get templateVersionUnavailable => 'テンプレートのバージョンを解決できませんでした。テンプレート registry またはネットワーク接続を確認して再度お試しください。';
 }
 
 // Path: versionCheck
@@ -408,6 +410,8 @@ extension on TranslationsJa {
 			'template.registryMissingUrl' => ({required Object version}) => 'テンプレートバージョン ${version} は registry に有効な url フィールドがありません。',
 			'template.registryVersionNotFound' => ({required Object version}) => '現在のテンプレート registry にバージョン ${version} が登録されていません。そのテンプレートバージョンが公開されているか、またはこのテンプレートをサポートする fluzer にアップグレードしてください。',
 			'template.registryLocateFailed' => ({required Object version, required Object error}) => 'テンプレートバージョン ${version} のダウンロード元の特定に失敗：${error}',
+			'template.zipUrlMissingVersion' => ({required Object url}) => '環境変数 FLUZER_TEMPLATE_ZIP_URL のテンプレート URL からバージョンを特定できません: ${url}\nURL には 1.2.3 のようなバージョンが含まれている必要があります（例: .../1.0.0/bricks.zip）。',
+			'template.templateVersionUnavailable' => 'テンプレートのバージョンを解決できませんでした。テンプレート registry またはネットワーク接続を確認して再度お試しください。',
 			'versionCheck.cacheLatest' => '（キャッシュ）最新バージョンです。',
 			'versionCheck.pubdevLatest' => '（pub.dev）最新バージョンです。',
 			'versionCheck.detailCacheExpired' => ({required Object packageName}) => 'バージョン確認キャッシュの有効期限切れ（${packageName}）、再取得します',

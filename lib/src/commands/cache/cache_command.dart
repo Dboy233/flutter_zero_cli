@@ -1,7 +1,7 @@
 // `cache` 命令：管理本地模板缓存（list / clean）。
 //
 // 缓存根目录为 `系统临时目录/fluzer_cache`，其中每个子目录是一份按版本
-// 隔离的模板缓存（`template_<版本号>` 或 `fluzer_<url 哈希>`）。
+// 隔离的模板缓存，目录名为 `template_<版本号>`。
 
 import 'dart:io';
 

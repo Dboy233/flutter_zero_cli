@@ -63,27 +63,25 @@ class LocalBrickLoader extends BrickLoader {
 /// 远程 Brick 加载器（线上版本）。
 ///
 /// 从 [zipUrl] 下载 zip 并解压到缓存目录，加载其中 `bricks/<brickName>`
-/// 目录。下载结果按模板版本号缓存（`template_<版本号>`），不同版本互不覆盖；
-/// 若未知版本号（如环境变量覆盖 / 回退默认地址），则退化为按 [zipUrl] 哈希缓存。
-/// 下载失败（直连与镜像均不可达）时抛出 [CliException]。
+/// 目录。下载结果按模板版本号缓存（目录名为 `template_<版本号>`），不同版本
+/// 互不覆盖。下载失败（直连与镜像均不可达）时抛出 [CliException]。
 ///
 /// Remote brick loader (production). Downloads a zip from [zipUrl], extracts
 /// it into a cache directory, and loads `bricks/<brickName>` from it.
-/// Results are cached by template version (`template_<version>`); when the
-/// version is unknown it falls back to a hash of [zipUrl].
+/// Results are cached by template version (`template_<version>`).
 class RemoteBrickLoader extends BrickLoader {
   /// 创建远程加载器。
   ///
   /// [zipUrl] 为模板仓库的 zip 下载链接（如 GitHub release / archive 链接）。
   /// [templateVersion] 为该模板的语义化版本号（来自 registry），用于生成可读的
-  /// 缓存键 `template_<版本号>`；为 `null` 时退化为 [zipUrl] 哈希缓存。
+  /// 缓存键 `template_<版本号>`。
   /// [httpClient] 为统一 HTTP 客户端（含镜像降级与下载进度）；省略时新建。
   ///
   /// Creates a remote loader. [zipUrl] is the zip download URL of the
   /// template repository (e.g. a GitHub release or archive link).
   RemoteBrickLoader({
     required this.zipUrl,
-    this.templateVersion,
+    required this.templateVersion,
     FluzerHttpClient? httpClient,
     Directory? cacheDir,
     Logger? logger,
@@ -93,9 +91,7 @@ class RemoteBrickLoader extends BrickLoader {
        cacheDir =
            cacheDir ??
            Directory(p.join(Directory.systemTemp.path, cacheDirName)),
-       cacheKey = (templateVersion != null && templateVersion.isNotEmpty)
-           ? 'template_$templateVersion'
-           : 'fluzer_${zipUrl.hashCode.abs()}',
+       cacheKey = 'template_$templateVersion',
        logger = logger ?? Logger();
 
   /// 模板 zip 下载链接。
@@ -103,10 +99,10 @@ class RemoteBrickLoader extends BrickLoader {
   /// Template zip download URL.
   final String zipUrl;
 
-  /// 模板的语义化版本号（用于生成可读缓存键），未知时为 `null`。
+  /// 模板的语义化版本号（用于生成可读缓存键 `template_<版本号>`）。
   ///
-  /// Semantic version of the template (for a readable cache key), or `null`.
-  final String? templateVersion;
+  /// Semantic version of the template (for a readable cache key).
+  final String templateVersion;
 
   /// 统一 HTTP 客户端（镜像降级 + 下载进度）。
   ///
@@ -118,12 +114,12 @@ class RemoteBrickLoader extends BrickLoader {
   /// Cache root directory.
   final Directory cacheDir;
 
-  /// 缓存键：优先 `template_<版本号>`，未知版本时退化为 [zipUrl] 哈希。
+  /// 缓存键：`template_<版本号>`。
   ///
-  /// Cache key: prefers `template_<version>`, falls back to a [zipUrl] hash.
+  /// Cache key: `template_<version>`.
   final String cacheKey;
 
-  /// log
+  /// 日志器（用于下载进度与缓存提示）。
   final Logger logger;
 
   /// 本地化消息（类型安全访问器）。

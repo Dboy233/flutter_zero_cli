@@ -44,7 +44,8 @@ class TemplateSourceResolver {
     FluzerHttpClient? httpClient,
     Logger? logger,
     Translations? messages,
-  }) : _httpClient = httpClient ?? FluzerHttpClient(logger: logger, messages: messages),
+  }) : _httpClient =
+           httpClient ?? FluzerHttpClient(logger: logger, messages: messages),
        _messages = messages ?? AppLocale.zh.buildSync(),
        _logger = logger ?? Logger();
 
@@ -66,14 +67,20 @@ class TemplateSourceResolver {
     }
 
     // 2. 测试 / 调试：允许通过环境变量强制指定远程 URL。
-    // url必须是发布的可以下载的github链接。
+    // 该 URL 必须是可下载的已发布 GitHub 发布链接，且包含语义化版本号。
     final overrideUrl = Platform.environment['FLUZER_TEMPLATE_ZIP_URL'];
     if (overrideUrl != null && overrideUrl.isNotEmpty) {
       _logger.detail(_messages.template.usingZipUrl);
       _logger.detail('FLUZER_TEMPLATE_ZIP_URL = $overrideUrl');
+      var overrideVersion = VersionExtractor.extractVersion(overrideUrl);
+      if (overrideVersion == null) {
+        throw CliException(
+          _messages.template.zipUrlMissingVersion(url: overrideUrl),
+        );
+      }
       return RemoteBrickLoader(
         zipUrl: overrideUrl,
-        templateVersion: VersionExtractor.extractVersion(overrideUrl),
+        templateVersion: overrideVersion,
         httpClient: _httpClient,
         messages: _messages,
       );
@@ -82,9 +89,17 @@ class TemplateSourceResolver {
     final selected = pinnedVersion == null
         ? await selectLatest()
         : await selectExact(pinnedVersion);
+
+    var templateZipUrl = selected.url;
+    var templateVersion = selected.version;
+
+    if (templateVersion == null) {
+      throw CliException(_messages.template.templateVersionUnavailable);
+    }
+
     return RemoteBrickLoader(
-      zipUrl: selected.url,
-      templateVersion: selected.version,
+      zipUrl: templateZipUrl,
+      templateVersion: templateVersion,
       httpClient: _httpClient,
       messages: _messages,
     );
@@ -94,7 +109,8 @@ class TemplateSourceResolver {
   ///
   /// 遍历 `templates`，在所有 `minCliVersion <= [cliVersion]` 的记录中，
   /// 选取 `version` 最大者的 `url` 与 `version`；无匹配或拉取失败时回退
-  /// [defaultTemplateZipUrl]，此时 `version` 为 `null`（缓存键退化为 URL 哈希）。
+  /// [defaultTemplateZipUrl]，版本号从默认 URL 中提取。registry 返回内容
+  /// 无法解析时 `version` 为 `null`，由 [resolve] 统一抛出 [CliException]。
   Future<({String url, String? version})> selectLatest({
     String registryUrl = templateRegistryUrl,
   }) async {
@@ -152,7 +168,9 @@ class TemplateSourceResolver {
     try {
       final body = await _httpClient.getText(registryUrl);
       if (body == null) {
-        throw CliException(_messages.template.registryUnavailable(version: version));
+        throw CliException(
+          _messages.template.registryUnavailable(version: version),
+        );
       }
 
       final json = jsonDecode(body) as Map<String, dynamic>;

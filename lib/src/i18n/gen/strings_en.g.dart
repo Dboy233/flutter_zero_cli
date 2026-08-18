@@ -212,6 +212,8 @@ class _Translations$template$en implements Translations$template$zh {
 	@override String registryMissingUrl({required Object version}) => 'Template version ${version} has no valid "url" in the registry.';
 	@override String registryVersionNotFound({required Object version}) => 'Template version ${version} was not found in the registry. Confirm it is published or upgrade fluzer.';
 	@override String registryLocateFailed({required Object version, required Object error}) => 'Failed to locate download source for template version ${version}: ${error}';
+	@override String zipUrlMissingVersion({required Object url}) => 'The template URL in FLUZER_TEMPLATE_ZIP_URL has no recognizable version: ${url}\nThe URL must contain a semantic version like 1.2.3 (e.g. .../1.0.0/bricks.zip).';
+	@override String get templateVersionUnavailable => 'Failed to resolve the template version. Check the template registry or your network connection and try again.';
 }
 
 // Path: versionCheck
@@ -408,6 +410,8 @@ extension on TranslationsEn {
 			'template.registryMissingUrl' => ({required Object version}) => 'Template version ${version} has no valid "url" in the registry.',
 			'template.registryVersionNotFound' => ({required Object version}) => 'Template version ${version} was not found in the registry. Confirm it is published or upgrade fluzer.',
 			'template.registryLocateFailed' => ({required Object version, required Object error}) => 'Failed to locate download source for template version ${version}: ${error}',
+			'template.zipUrlMissingVersion' => ({required Object url}) => 'The template URL in FLUZER_TEMPLATE_ZIP_URL has no recognizable version: ${url}\nThe URL must contain a semantic version like 1.2.3 (e.g. .../1.0.0/bricks.zip).',
+			'template.templateVersionUnavailable' => 'Failed to resolve the template version. Check the template registry or your network connection and try again.',
 			'versionCheck.cacheLatest' => '(cache) Already up to date.',
 			'versionCheck.pubdevLatest' => '(pub.dev) Already up to date.',
 			'versionCheck.detailCacheExpired' => ({required Object packageName}) => 'Version check cache expired for ${packageName}, will re-fetch',

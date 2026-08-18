@@ -410,6 +410,12 @@ class Translations$template$zh {
 
 	/// zh: '定位模板版本 $version 的下载源失败：$error'
 	String registryLocateFailed({required Object version, required Object error}) => '定位模板版本 ${version} 的下载源失败：${error}';
+
+	/// zh: '环境变量 FLUZER_TEMPLATE_ZIP_URL 指定的模板地址无法识别版本号：$url 链接需包含形如 1.2.3 的版本号（例如 .../1.0.0/bricks.zip）。'
+	String zipUrlMissingVersion({required Object url}) => '环境变量 FLUZER_TEMPLATE_ZIP_URL 指定的模板地址无法识别版本号：${url}\n链接需包含形如 1.2.3 的版本号（例如 .../1.0.0/bricks.zip）。';
+
+	/// zh: '无法解析模板版本号，请检查模板 registry 或网络连接后重试。'
+	String get templateVersionUnavailable => '无法解析模板版本号，请检查模板 registry 或网络连接后重试。';
 }
 
 // Path: versionCheck
@@ -674,6 +680,8 @@ extension on Translations {
 			'template.registryMissingUrl' => ({required Object version}) => '模板版本 ${version} 在 registry 中缺少有效的 url 字段。',
 			'template.registryVersionNotFound' => ({required Object version}) => '当前模板 registry 未收录版本 ${version}，请确认该模板版本已发布，或升级 fluzer 到支持该模板的版本。',
 			'template.registryLocateFailed' => ({required Object version, required Object error}) => '定位模板版本 ${version} 的下载源失败：${error}',
+			'template.zipUrlMissingVersion' => ({required Object url}) => '环境变量 FLUZER_TEMPLATE_ZIP_URL 指定的模板地址无法识别版本号：${url}\n链接需包含形如 1.2.3 的版本号（例如 .../1.0.0/bricks.zip）。',
+			'template.templateVersionUnavailable' => '无法解析模板版本号，请检查模板 registry 或网络连接后重试。',
 			'versionCheck.cacheLatest' => '（缓存）已是最新版本。',
 			'versionCheck.pubdevLatest' => '（pub.dev）已是最新版本。',
 			'versionCheck.detailCacheExpired' => ({required Object packageName}) => '版本检查缓存已过期（${packageName}），将重新获取',
