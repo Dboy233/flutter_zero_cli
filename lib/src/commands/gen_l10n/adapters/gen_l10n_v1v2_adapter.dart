@@ -15,6 +15,7 @@ import 'package:fluzer/src/gen_l10n/l10n_parser.dart';
 import 'package:fluzer/src/gen_l10n/toast_handle_patcher.dart';
 import 'package:fluzer/src/util/semantic_version.dart';
 import 'package:fluzer/src/util/step_runner.dart';
+import 'package:fluzer/src/version/version_update_notifier.dart';
 import 'package:path/path.dart' as path;
 
 /// 1.0.0 起通用适配器（无上界）：gen-l10n 集成步骤跨版本一致，
@@ -39,13 +40,18 @@ class GenL10nV1V2Adapter extends BaseGenL10nAdapter {
     late String projectRoot;
     late ProjectConfig config;
     late L10nConfig l10nConfig;
-    late List<FileSystemEntity> arbFiles;
     late File appLocalizationsFile;
     late List<L10nMember> members;
-    final generatedPaths = <String>[];
-    late ({ToastHandlePatchOutcome outcome, bool fileNotFound}) patchResult;
 
     final steps = StepRunner(logger: logger, translations: translations);
+
+    // 启动版本检查提示（仅在项目内执行的 gen-l10n 命令显式 opt-in；缓存命中瞬时
+    // 提示，缓存未命中以 spinner 包裹网络等待；无更新 / 网络异常静默降级）。
+    await VersionUpdateNotifier(
+      logger: logger,
+      translations: translations,
+      versionCheckService: deps.versionCheckService,
+    ).notify(steps);
 
     // 1. 校验项目与版本门禁
     steps.add(translations.genL10n.step1Validate, () async {
@@ -75,7 +81,7 @@ class GenL10nV1V2Adapter extends BaseGenL10nAdapter {
             translations.genL10n.arbDirNotFound(dir: l10nConfig.arbDir),
           );
         }
-        arbFiles = await arbDir
+        final arbFiles = await arbDir
             .list()
             .where((e) => e is File && e.path.endsWith('.arb'))
             .toList();
@@ -87,8 +93,9 @@ class GenL10nV1V2Adapter extends BaseGenL10nAdapter {
         logger.detail(
           '  arb 文件: ${arbFiles.map((f) => path.basename(f.path)).join(', ')}',
         );
+        return arbFiles;
       },
-      onDone: () {
+      onDone: (arbFiles) {
         logger.success(
           translations.genL10n.foundArbFiles(count: arbFiles.length),
         );
@@ -117,7 +124,7 @@ class GenL10nV1V2Adapter extends BaseGenL10nAdapter {
         }
         appLocalizationsFile = found;
         final source = await appLocalizationsFile.readAsString();
-        members = parseAppLocalizations(
+        members = L10nParser.parseAppLocalizations(
           source,
           className: l10nConfig.outputClass,
           messages: translations,
@@ -128,7 +135,7 @@ class GenL10nV1V2Adapter extends BaseGenL10nAdapter {
           ),
         );
       },
-      onDone: () {
+      onDone: (_) {
         final noParamCount = members.where((m) => !m.hasParams).length;
         final withParamCount = members.length - noParamCount;
         logger.info(
@@ -153,19 +160,25 @@ class GenL10nV1V2Adapter extends BaseGenL10nAdapter {
           ...l10nConfig.outputDir.split('/'),
         ]);
         final outputs = <File, String>{
-          File(path.join(genDir, 'l10n_code.dart')): generateL10nCode(members),
-          File(path.join(genDir, 'l10n_code_ext.dart')): generateL10nCodeExt(
+          File(path.join(genDir, 'l10n_code.dart')):
+              L10nCodeGenerator.generateL10nCode(members),
+          File(path.join(genDir, 'l10n_code_ext.dart')):
+              L10nCodeGenerator.generateL10nCodeExt(config.packageName),
+          File(
+            path.join(genDir, 'l10n_toast_effect_helper.dart'),
+          ): L10nCodeGenerator.generateL10nToastEffectHelper(
+            members,
             config.packageName,
           ),
-          File(path.join(genDir, 'l10n_toast_effect_helper.dart')):
-              generateL10nToastEffectHelper(members, config.packageName),
         };
+        final generatedPaths = <String>[];
         for (final entry in outputs.entries) {
           await entry.key.writeAsString(entry.value);
           generatedPaths.add(entry.key.path);
         }
+        return generatedPaths;
       },
-      onDone: () {
+      onDone: (generatedPaths) {
         for (final p in generatedPaths) {
           logger.success(translations.genL10n.generated(path: p));
         }
@@ -175,15 +188,13 @@ class GenL10nV1V2Adapter extends BaseGenL10nAdapter {
     // 6. 接线 defaultToastHandle（条件步骤：仅未 --skip-handle-patch 时启用）
     steps.add(
       translations.genL10n.step6Wire,
-      () async {
-        patchResult = await _patchDefaultToastHandle(
-          projectRoot: projectRoot,
-          packageName: config.packageName,
-          force: ctx.forceHandlePatch,
-        );
-      },
+      () async => _patchDefaultToastHandle(
+        projectRoot: projectRoot,
+        packageName: config.packageName,
+        force: ctx.forceHandlePatch,
+      ),
       enabled: !ctx.skipHandlePatch,
-      onDone: () {
+      onDone: (patchResult) {
         _reportPatchResult(patchResult.outcome, patchResult.fileNotFound);
       },
     );
@@ -209,7 +220,7 @@ class GenL10nV1V2Adapter extends BaseGenL10nAdapter {
   /// 将 `default_toast_effect_handle.dart` 的 l10nCode 分支接线到
   /// `L10nToastEffectHelper`；patched 时补齐 import 并统一格式化。
   ///
-  /// 不在此处打印状态（会破坏外层 runWithSpinner 的动画行），改为返回
+  /// 不在此处打印状态（会破坏外层 SpinnerRunner 的动画行），改为返回
   /// [ToastHandlePatchOutcome] 与文件是否缺失标记，由调用方在 spinner 结束后
   /// 通过 [_reportPatchResult] 打印。
   Future<({ToastHandlePatchOutcome outcome, bool fileNotFound})>
@@ -228,7 +239,7 @@ class GenL10nV1V2Adapter extends BaseGenL10nAdapter {
         'default_toast_effect_handle.dart',
       ]),
     );
-    if (!handleFile.existsSync()) {
+    if (!await handleFile.exists()) {
       return (
         outcome: const (
           result: ToastHandlePatchResult.anchorNotFound,
@@ -254,10 +265,10 @@ class GenL10nV1V2Adapter extends BaseGenL10nAdapter {
     return (outcome: outcome, fileNotFound: false);
   }
 
-  /// 在 spinner 结束后打印接线结果（避免在 runWithSpinner 内部打印破坏动画行）。
+  /// 在 spinner 结束后打印接线结果（避免在 SpinnerRunner 内部打印破坏动画行）。
   ///
   /// Prints the patch result after the spinner ends (printing inside
-  /// runWithSpinner would break the animation row).
+  /// SpinnerRunner would break the animation row).
   void _reportPatchResult(ToastHandlePatchOutcome outcome, bool fileNotFound) {
     switch (outcome.result) {
       case ToastHandlePatchResult.patched:

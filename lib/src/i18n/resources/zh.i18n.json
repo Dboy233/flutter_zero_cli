@@ -35,7 +35,6 @@
     "description": "新增功能模块",
     "nameRequired": "错误：请指定功能名",
     "featureNameEmpty": "功能名不能为空。",
-    "buildRunnerHelp": "生成后是否运行 build_runner",
     "step1Load": "加载项目配置",
     "step2Template": "解析模板加载器（本地或远程下载）",
     "step3Generate": "生成功能模块 $feature",
@@ -47,7 +46,6 @@
     "buildRunnerCompleted": "build_runner 执行完成。",
     "generationFailed": "生成失败：$error",
     "successCreated": "功能模块 $feature 已创建并注册到 DI。",
-    "skipBuildRunner": "跳过 build_runner，可手动运行：\n  dart run build_runner build",
     "featureExists": "功能模块 $feature 已存在。",
     "featureNameInvalid": "功能名必须是 snake_case 且以小写字母开头，例如 user_profile。"
   },

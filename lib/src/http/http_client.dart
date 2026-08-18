@@ -25,15 +25,6 @@ import 'race_http_client.dart';
 /// Unified HTTP client with mirror-fallback racing. Tries the direct URL and
 /// every configured mirror prefix concurrently; the first success wins and
 /// the rest are cancelled. Returns `null` when all attempts fail.
-/// 是否显示下载进度条。
-///
-/// 仅在 `--log`（verbose 级别）且为交互终端时显示；默认模式由
-/// [runWithSpinner] 的旋转 spinner 体现进度，避免重复输出与空行干扰。
-/// 将 [hasTerminal] 作为参数传入，便于在测试（通常无终端）中显式断言
-/// 各级别组合下的显示决策。
-bool shouldShowDownloadProgress(Logger? logger, bool hasTerminal) =>
-    hasTerminal && logger?.level == Level.verbose;
-
 class FluzerHttpClient {
   /// 创建客户端。
   ///
@@ -48,6 +39,13 @@ class FluzerHttpClient {
   FluzerHttpClient({this._logger, Dio? dio, Translations? messages})
     : _messages = messages ?? AppLocale.zh.buildSync(),
       _race = RaceHttpClient(dio: dio);
+
+  /// 是否显示下载进度条。
+  ///
+  /// 仅在 `--log`（verbose 级别）且为交互终端时显示；默认模式由
+  /// [SpinnerRunner] 的旋转 spinner 体现进度，避免重复输出与空行干扰。
+  static bool shouldShowDownloadProgress(Logger? logger, bool hasTerminal) =>
+      hasTerminal && logger?.level == Level.verbose;
 
   final Logger? _logger;
   final Translations _messages;
@@ -102,7 +100,7 @@ class FluzerHttpClient {
   Future<DownloadedFile?> downloadFile(String url) async {
     final urls = _buildCandidateUrls(url);
     // 进度条仅在 --log（verbose 级别）且为交互终端时显示；默认模式由
-    // runWithSpinner 的旋转 spinner 体现进度，避免重复输出与空行干扰。
+    // SpinnerRunner 的旋转 spinner 体现进度，避免重复输出与空行干扰。
     final showProgress =
         shouldShowDownloadProgress(_logger, stdout.hasTerminal);
 

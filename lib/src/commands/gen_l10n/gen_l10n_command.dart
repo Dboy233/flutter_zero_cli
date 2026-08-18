@@ -4,10 +4,9 @@ import 'package:fluzer/src/commands/command_adapter.dart';
 import 'package:fluzer/src/commands/gen_l10n/adapters/base_gen_l10n_adapter.dart';
 import 'package:fluzer/src/commands/gen_l10n/adapters/gen_l10n_v1v2_adapter.dart';
 import 'package:fluzer/src/commands/gen_l10n/gen_l10n_context.dart';
-import 'package:fluzer/src/template/template_version_reader.dart';
 import 'package:fluzer/src/gen_l10n/toast_handle_patcher.dart';
 import 'package:fluzer/src/process/process_runner.dart';
-import 'package:fluzer/src/version/version_update_notifier.dart';
+import 'package:fluzer/src/template/template_version_reader.dart';
 import 'package:mason_logger/mason_logger.dart';
 
 /// `gen-l10n` 命令：执行 Flutter 国际化代码生成，并自动生成
@@ -89,18 +88,6 @@ class GenL10nCommand extends AdapterCommand<GenL10nCommandContext> {
   }
 
   @override
-  Future<int> execute(GenL10nCommandContext ctx) async {
-    // 启动版本检查提示（仅在项目内执行的 gen-l10n 命令显式 opt-in；缓存命中瞬时
-    // 提示，缓存未命中以 spinner 包裹网络等待；无更新 / 网络异常静默降级）。
-    await ensureUpdateNotified(
-      logger: logger,
-      translations: translations,
-      versionCheckService: versionCheckService,
-    );
-    return super.execute(ctx);
-  }
-
-  @override
   List<CommandAdapter<GenL10nCommandContext>> get adapters => [
     GenL10nV1V2Adapter(deps: _genL10nDeps),
   ];
@@ -112,6 +99,7 @@ class GenL10nCommand extends AdapterCommand<GenL10nCommandContext> {
     patcher: _patcher,
     flutterGenL10nFn: _flutterGenL10n ?? _defaultFlutterGenL10n,
     workingDirectory: workingDirectory,
+    versionCheckService: versionCheckService,
   );
 
   Future<int> _defaultFlutterGenL10n(String projectRoot) {

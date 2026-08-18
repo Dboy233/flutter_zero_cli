@@ -16,6 +16,7 @@ import 'package:fluzer/src/commands/new/new_context.dart';
 import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:fluzer/src/process/process_runner.dart';
 import 'package:fluzer/src/template/brick_loader.dart';
+import 'package:fluzer/src/version/version_check.dart';
 import 'package:mason_logger/mason_logger.dart';
 
 /// `new` 适配器依赖（构造注入）。
@@ -31,6 +32,7 @@ class NewAdapterDeps {
     required this.loader,
     required this.processRunner,
     required this.workingDirectory,
+    required this.versionCheckService,
   });
 
   /// 日志器。
@@ -57,6 +59,9 @@ class NewAdapterDeps {
   ///
   /// Start dir for walking up to the project.
   final Directory? workingDirectory;
+
+
+  final VersionCheckService versionCheckService;
 }
 
 /// `new` 适配器基类（Template Method + Strategy）。

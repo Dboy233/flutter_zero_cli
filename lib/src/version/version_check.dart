@@ -111,13 +111,10 @@ class VersionCacheEntry {
 /// [logger] and [dio] are constructor-injected (DIP); once constructed, every
 /// method has direct access to the shared dependencies.
 class VersionCheckService {
-  VersionCheckService({
-    Logger? logger,
-    Dio? dio,
-    Translations? messages,
-  })  : _logger = logger ?? Logger(),
-        _dio = dio ?? Dio(),
-        _messages = messages ?? AppLocale.zh.buildSync();
+  VersionCheckService({Logger? logger, Dio? dio, Translations? messages})
+    : _logger = logger ?? Logger(),
+      _dio = dio ?? Dio(),
+      _messages = messages ?? AppLocale.zh.buildSync();
 
   final Logger _logger;
   final Dio _dio;
@@ -125,13 +122,16 @@ class VersionCheckService {
 
   // ---- 公共 API ----
 
-  /// 同步读取缓存中的版本检查结果（不触网）。
+  /// 读取缓存中的版本检查结果（不触网）。
   ///
   /// 仅当缓存存在且未过期时返回结果；否则返回 null，调用方需自行发起网络检查。
   ///
-  /// Synchronous read of the cached version check (no network).
-  VersionCheckResult? peekCachedUpdate({String packageName = cliPackageName}) {
-    final entry = _readCache()[packageName];
+  /// Reads the cached version check (no network). I/O is asynchronous to avoid
+  /// blocking the event loop on the (possibly slow) temp volume.
+  Future<VersionCheckResult?> peekCachedUpdate({
+    String packageName = cliPackageName,
+  }) async {
+    final entry = (await _readCache())[packageName];
     if (entry == null) return null;
     // 可用结果缓存 24h；不可用结果（包未发布 / 网络异常）只缓存 10 分钟。
     final stale = entry.available
@@ -179,7 +179,7 @@ class VersionCheckService {
   Future<VersionCheckResult> checkForUpdate({
     String packageName = cliPackageName,
   }) async {
-    final cached = peekCachedUpdate(packageName: packageName);
+    final cached = await peekCachedUpdate(packageName: packageName);
     if (cached != null) {
       _logger.detail(
         _messages.versionCheck.detailUsingCached(packageName: packageName),
@@ -206,7 +206,7 @@ class VersionCheckService {
             packageName: packageName,
           ),
         );
-        _writeCache(packageName, null);
+        await _writeCache(packageName, null);
         return VersionCheckResult.unavailable(
           current: cliVersion,
           packageName: packageName,
@@ -224,7 +224,7 @@ class VersionCheckService {
           hasUpdate: hasUpdate,
         ),
       );
-      _writeCache(packageName, latest);
+      await _writeCache(packageName, latest);
       return VersionCheckResult(
         current: cliVersion,
         latest: latest,
@@ -238,7 +238,7 @@ class VersionCheckService {
           error: e,
         ),
       );
-      _writeCache(packageName, null);
+      await _writeCache(packageName, null);
       return VersionCheckResult.unavailable(
         current: cliVersion,
         packageName: packageName,
@@ -252,11 +252,12 @@ class VersionCheckService {
 
   String get _cacheFile => '$_cacheDir/version_check.json';
 
-  Map<String, VersionCacheEntry> _readCache() {
+  Future<Map<String, VersionCacheEntry>> _readCache() async {
     try {
       final file = File(_cacheFile);
-      if (!file.existsSync()) return {};
-      final raw = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      if (!await file.exists()) return {};
+      final raw = jsonDecode(await file.readAsString())
+          as Map<String, dynamic>;
       return raw.map(
         (k, v) =>
             MapEntry(k, VersionCacheEntry.fromJson(v as Map<String, dynamic>)),
@@ -268,12 +269,12 @@ class VersionCheckService {
   }
 
   /// 写入缓存。[latest] 为 null 表示本次检查不可用（包未发布 / 网络异常）。
-  void _writeCache(String packageName, String? latest) {
+  Future<void> _writeCache(String packageName, String? latest) async {
     try {
       final dir = Directory(_cacheDir);
-      if (!dir.existsSync()) dir.createSync(recursive: true);
+      if (!await dir.exists()) await dir.create(recursive: true);
       final file = File(_cacheFile);
-      final all = _readCache();
+      final all = await _readCache();
       all[packageName] = VersionCacheEntry(
         latest: latest,
         available: latest != null,
@@ -283,7 +284,7 @@ class VersionCheckService {
       for (final e in all.entries) {
         json[e.key] = e.value.toJson();
       }
-      file.writeAsStringSync(jsonEncode(json));
+      await file.writeAsString(jsonEncode(json));
     } on Object catch (e) {
       _logger.detail(_messages.versionCheck.detailCacheWriteFailed(error: e));
     }

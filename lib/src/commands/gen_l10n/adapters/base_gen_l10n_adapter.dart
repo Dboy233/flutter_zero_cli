@@ -15,6 +15,7 @@ import 'package:fluzer/src/commands/gen_l10n/gen_l10n_context.dart';
 import 'package:fluzer/src/gen_l10n/toast_handle_patcher.dart';
 import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:fluzer/src/process/process_runner.dart';
+import 'package:fluzer/src/version/version_check.dart';
 import 'package:mason_logger/mason_logger.dart';
 
 /// `gen-l10n` 命令 flutter gen-l10n 执行器签名。
@@ -36,6 +37,7 @@ class GenL10nAdapterDeps {
     required this.patcher,
     required this.flutterGenL10nFn,
     required this.workingDirectory,
+    required this.versionCheckService,
   });
 
   /// 日志器。
@@ -67,6 +69,8 @@ class GenL10nAdapterDeps {
   ///
   /// Start dir for walking up to the project.
   final Directory? workingDirectory;
+
+  final VersionCheckService versionCheckService;
 }
 
 /// `gen-l10n` 适配器基类（Template Method + Strategy）。

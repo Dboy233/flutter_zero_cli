@@ -34,30 +34,18 @@ void main() {
     });
   });
 
-  group('toPascalCase', () {
+  group('CaseConverter.toPascalCase', () {
     test('多段 snake_case', () {
-      expect(toPascalCase('user_profile'), 'UserProfile');
+      expect(CaseConverter.toPascalCase('user_profile'), 'UserProfile');
     });
     test('单段', () {
-      expect(toPascalCase('user'), 'User');
+      expect(CaseConverter.toPascalCase('user'), 'User');
     });
     test('空串', () {
-      expect(toPascalCase(''), '');
+      expect(CaseConverter.toPascalCase(''), '');
     });
     test('连续段与已大写首字母', () {
-      expect(toPascalCase('a_b_c'), 'ABC');
-    });
-  });
-
-  group('toCamelCase', () {
-    test('多段 snake_case', () {
-      expect(toCamelCase('user_profile'), 'userProfile');
-    });
-    test('单段小写首字母', () {
-      expect(toCamelCase('user'), 'user');
-    });
-    test('空串', () {
-      expect(toCamelCase(''), '');
+      expect(CaseConverter.toPascalCase('a_b_c'), 'ABC');
     });
   });
 }

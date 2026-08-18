@@ -55,17 +55,21 @@ class L10nMember {
   String toString() => 'L10nMember($name, $params)';
 }
 
-/// 从生成的 app_localizations.dart 源码中解析出所有本地化成员。
+/// 从生成的 app_localizations.dart 源码中解析出所有本地化成员的工具类。
 ///
-/// [className] 对应 l10n.yaml 的 `output-class`，默认 `AppLocalizations`。
-///
-/// 无法识别的成员/参数声明会抛出 [FormatException]——宁可失败也不
-/// 静默生成错误的代码。
-List<L10nMember> parseAppLocalizations(
-  String source, {
-  String className = 'AppLocalizations',
-  required Translations messages,
-}) {
+/// 所有方法为静态，无外部依赖；原文件级函数封装进类以满足纯 OOP 约束。
+class L10nParser {
+  /// 从生成的 app_localizations.dart 源码中解析出所有本地化成员。
+  ///
+  /// [className] 对应 l10n.yaml 的 `output-class`，默认 `AppLocalizations`。
+  ///
+  /// 无法识别的成员/参数声明会抛出 [FormatException]——宁可失败也不
+  /// 静默生成错误的代码。
+  static List<L10nMember> parseAppLocalizations(
+    String source, {
+    String className = 'AppLocalizations',
+    required Translations messages,
+  }) {
   final body = extractClassBody(source, className, messages);
   final members = <L10nMember>[];
 
@@ -88,7 +92,11 @@ List<L10nMember> parseAppLocalizations(
 }
 
 /// 解析方法参数串 `"Object count, int index"` → [L10nParam] 列表。
-List<L10nParam> _parseParams(String paramsStr, String memberName, Translations messages) {
+  static List<L10nParam> _parseParams(
+    String paramsStr,
+    String memberName,
+    Translations messages,
+  ) {
   final params = <L10nParam>[];
   for (final raw in paramsStr.split(',')) {
     final trimmed = raw.trim();
@@ -114,7 +122,11 @@ List<L10nParam> _parseParams(String paramsStr, String memberName, Translations m
 ///
 /// Extracts the body of `abstract class <className>` using a
 /// brace-counting scanner that skips comments and string literals.
-String extractClassBody(String source, String className, Translations messages) {
+  static String extractClassBody(
+    String source,
+    String className,
+    Translations messages,
+  ) {
   final decl =
       RegExp('abstract\\s+class\\s+$className\\b').firstMatch(source);
   if (decl == null) {
@@ -166,7 +178,7 @@ String extractClassBody(String source, String className, Translations messages) 
 }
 
 /// 跳过从 [i]（引号位置）开始的字符串字面量，返回字面量后的下标。
-int _skipString(String source, int i) {
+  static int _skipString(String source, int i) {
   final quote = source[i];
   // 三引号字符串
   if (i + 2 < source.length && source[i + 1] == quote && source[i + 2] == quote) {
@@ -183,4 +195,6 @@ int _skipString(String source, int i) {
     j++;
   }
   return source.length;
+}
+
 }

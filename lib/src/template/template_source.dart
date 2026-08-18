@@ -126,7 +126,13 @@ class TemplateSourceResolver {
         }
       }
       if (bestUrl == null || bestVersion == null) {
-        return (url: defaultTemplateZipUrl, version: null);
+        // 与「registry 不可达」分支（body == null）保持一致的缓存键：
+        // 都从默认 URL 提取版本号，避免同一默认模板因回退路径不同而被
+        // 缓存为两个不同的键、重复下载。
+        return (
+          url: defaultTemplateZipUrl,
+          version: VersionExtractor.extractVersion(defaultTemplateZipUrl),
+        );
       }
       return (url: bestUrl, version: bestVersion.toString());
     } on Object catch (e) {

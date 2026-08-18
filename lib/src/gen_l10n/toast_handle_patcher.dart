@@ -52,10 +52,11 @@ const String wiredMarker = 'L10nToastEffectHelper';
 /// 模板态特征。
 const String _templateMarker = 'assert(';
 
-/// 替换后的分支体（不含外层花括号）。
-const String _replacementBody = '''
+/// 依据 `defaultToastHandle` 的真实 `BuildContext` 形参名构造替换分支体，
+/// 避免硬编码 `context` 导致自定义形参名的模板接线出非法的未定义引用。
+String _buildReplacementBody(String contextParamName) => '''
 L10nToastEffectHelper.showToastFromL10nCode(
-          context,
+          $contextParamName,
           L10nCode.parse(effect.l10nCode!),
         );''';
 
@@ -87,6 +88,10 @@ class ToastHandlePatcher {
         replacedSource: null,
       );
     }
+
+    // 解析 defaultToastHandle 的真实 BuildContext 形参名，替换分支体时复用，
+    // 避免硬编码 `context` 在自定义形参名的模板上生成非法引用。
+    final contextParamName = _resolveContextParamName(fn.first);
 
     final body = fn.first.functionExpression.body;
     if (body is! BlockFunctionBody) {
@@ -138,7 +143,7 @@ class ToastHandlePatcher {
     final patched = source.replaceRange(
       contentStart,
       contentEnd,
-      '\n        $_replacementBody\n      ',
+      '\n        ${_buildReplacementBody(contextParamName)}\n      ',
     );
     await file.writeAsString(patched);
     return (
@@ -190,4 +195,34 @@ class ToastHandlePatcher {
 
   /// 去除所有空白字符，用于 condition 的格式无关比较。
   String _normalize(String value) => value.replaceAll(RegExp(r'\s+'), '');
+
+  /// 从 [fn] 解析 `BuildContext` 形参的真实名字，用于构造替换分支体。
+  ///
+  /// 优先匹配声明类型为 `BuildContext` 的形参；找不到时回退到第一个形参名，
+  /// 仍找不到则回退约定名 `context`（模板契约保证首参为 BuildContext）。
+  String _resolveContextParamName(FunctionDeclaration fn) {
+    final params = fn.functionExpression.parameters?.parameters ?? const [];
+    String? fallback;
+    for (final p in params) {
+      final name = _paramName(p);
+      final type = _paramTypeSource(p);
+      if (type != null && type.contains('BuildContext')) {
+        return name ?? 'context';
+      }
+      fallback ??= name;
+    }
+    return fallback ?? 'context';
+  }
+
+  /// 解开 [DefaultFormalParameter] 包裹，返回内层形参名。
+  String? _paramName(FormalParameter p) {
+    final inner = p is DefaultFormalParameter ? p.parameter : p;
+    return inner is SimpleFormalParameter ? inner.name?.lexeme : null;
+  }
+
+  /// 解开 [DefaultFormalParameter] 包裹，返回内层形参的类型源码。
+  String? _paramTypeSource(FormalParameter p) {
+    final inner = p is DefaultFormalParameter ? p.parameter : p;
+    return inner is SimpleFormalParameter ? inner.type?.toSource() : null;
+  }
 }

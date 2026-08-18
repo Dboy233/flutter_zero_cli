@@ -14,6 +14,7 @@ import 'package:fluzer/src/template/brick_renderer.dart';
 import 'package:fluzer/src/template/feature_generator.dart';
 import 'package:fluzer/src/template/template_source.dart';
 import 'package:fluzer/src/util/semantic_version.dart';
+import 'package:fluzer/src/version/version_update_notifier.dart';
 import 'package:mason/mason.dart';
 
 /// 1.0.x ~ 2.x 适配器：DI 注册目标为 `injection_base.dart`。
@@ -41,6 +42,15 @@ class NewV1V2Adapter extends BaseNewAdapter {
     late BrickLoader brickLoader;
 
     final steps = StepRunner(logger: logger, translations: translations);
+
+
+    // 启动版本检查提示（仅在项目内执行的 new 命令显式 opt-in；缓存命中瞬时提示，
+    // 缓存未命中以 spinner 包裹网络等待；无更新 / 网络异常静默降级，不阻断主流程）。
+    await VersionUpdateNotifier(
+      logger: logger,
+      translations: translations,
+      versionCheckService: deps.versionCheckService,
+    ).notify(steps);
 
     // 1. 加载项目配置
     steps.add(translations.feature.step1Load, () async {
@@ -72,14 +82,14 @@ class NewV1V2Adapter extends BaseNewAdapter {
         );
         await generator.generate(featureName);
       },
-      onDone: () {
+      onDone: (_) {
         logger.success(
           translations.feature.successCreated(feature: featureName),
         );
       },
     );
 
-    // 4. 运行 build_runner（条件步骤：仅 --build-runner 时启用；
+    // 4. 运行 build_runner（new 命令默认始终执行，确保生成代码可编译通过；
     //    子命令非零退出码时抛异常中断，由下方 catch 统一返回 1）
     steps.add(
       translations.feature.step4BuildRunner,
@@ -92,7 +102,7 @@ class NewV1V2Adapter extends BaseNewAdapter {
           throw CliException(translations.feature.buildRunnerFailed);
         }
       },
-      onDone: () {
+      onDone: (_) {
         logger.success(translations.feature.buildRunnerCompleted);
       },
     );

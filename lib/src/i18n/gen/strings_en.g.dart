@@ -109,7 +109,6 @@ class _Translations$feature$en implements Translations$feature$zh {
 	@override String get description => 'Add a new feature module';
 	@override String get nameRequired => 'Error: please specify a feature name';
 	@override String get featureNameEmpty => 'Feature name cannot be empty.';
-	@override String get buildRunnerHelp => 'Whether to run build_runner after generation';
 	@override String get step1Load => 'load project config';
 	@override String get step2Template => 'resolve template loader (local or remote download)';
 	@override String step3Generate({required Object feature}) => 'generate feature module ${feature}';
@@ -121,7 +120,6 @@ class _Translations$feature$en implements Translations$feature$zh {
 	@override String get buildRunnerCompleted => 'build_runner completed.';
 	@override String generationFailed({required Object error}) => 'Generation failed: ${error}';
 	@override String successCreated({required Object feature}) => 'Feature module ${feature} has been created and registered in DI.';
-	@override String get skipBuildRunner => 'Skipped build_runner; run it manually with:\n  dart run build_runner build';
 	@override String featureExists({required Object feature}) => 'Feature module ${feature} already exists.';
 	@override String get featureNameInvalid => 'Feature name must be snake_case and start with a lowercase letter, e.g. user_profile.';
 }
@@ -343,7 +341,6 @@ extension on TranslationsEn {
 			'feature.description' => 'Add a new feature module',
 			'feature.nameRequired' => 'Error: please specify a feature name',
 			'feature.featureNameEmpty' => 'Feature name cannot be empty.',
-			'feature.buildRunnerHelp' => 'Whether to run build_runner after generation',
 			'feature.step1Load' => 'load project config',
 			'feature.step2Template' => 'resolve template loader (local or remote download)',
 			'feature.step3Generate' => ({required Object feature}) => 'generate feature module ${feature}',
@@ -355,7 +352,6 @@ extension on TranslationsEn {
 			'feature.buildRunnerCompleted' => 'build_runner completed.',
 			'feature.generationFailed' => ({required Object error}) => 'Generation failed: ${error}',
 			'feature.successCreated' => ({required Object feature}) => 'Feature module ${feature} has been created and registered in DI.',
-			'feature.skipBuildRunner' => 'Skipped build_runner; run it manually with:\n  dart run build_runner build',
 			'feature.featureExists' => ({required Object feature}) => 'Feature module ${feature} already exists.',
 			'feature.featureNameInvalid' => 'Feature name must be snake_case and start with a lowercase letter, e.g. user_profile.',
 			'genL10n.description' => 'Generate localization code and create L10nCode class',

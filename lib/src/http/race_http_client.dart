@@ -250,7 +250,9 @@ class RaceHttpClient {
       if (resp.statusCode != 200) return null;
       return resp.data as String;
     } on Object {
-      return null;
+      // 非 200 视为软失败（上面已 return null）；真正的异常应向上传播，
+      // 交由竞速管理者经 [onFailure] 回调暴露给调用方，而非静默吞掉。
+      rethrow;
     }
   }
 
@@ -282,11 +284,12 @@ class RaceHttpClient {
       }
       return DownloadedFile(File(savePath), tempDir);
     } on Object {
-      // createTemp 可能已失败（此时目录不存在），先判断再删，避免二次异常。
-      if (tempDir.existsSync()) {
+      // createTemp 可能已失败（此时目录不存在），先判断再删，避免二次异常；
+      // 清理后向上传播异常，交由竞速管理者经 [onFailure] 暴露给调用方。
+      if (await tempDir.exists()) {
         await tempDir.delete(recursive: true);
       }
-      return null;
+      rethrow;
     }
   }
 }

@@ -34,7 +34,7 @@ class FeatureRegistration {
   /// Localized messages (type-safe accessors).
   final Translations _messages;
 
-  String get _pascal => toPascalCase(featureName);
+  String get _pascal => CaseConverter.toPascalCase(featureName);
   String get _moduleClass => '${_pascal}Module';
   String get _importUri =>
       '../../features/$featureName/${featureName}_module.dart';

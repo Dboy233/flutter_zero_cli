@@ -53,7 +53,7 @@ class LocalBrickLoader extends BrickLoader {
   @override
   Future<Brick> load(String brickName) async {
     final dir = Directory(p.normalize(p.join(bricksRoot.path, brickName)));
-    if (!dir.existsSync()) {
+    if (!await dir.exists()) {
       throw CliException(_messages.template.localTemplateNotFound(path: dir.path));
     }
     return Brick.path(dir.path);
@@ -135,7 +135,7 @@ class RemoteBrickLoader extends BrickLoader {
   Future<Brick> load(String brickName) async {
     final bricksRoot = await _resolveBricksRoot();
     final dir = Directory(p.join(bricksRoot.path, brickName));
-    if (!dir.existsSync()) {
+    if (!await dir.exists()) {
       throw CliException(
         _messages.template.remoteBrickNotFound(brickName: brickName),
       );
@@ -149,8 +149,8 @@ class RemoteBrickLoader extends BrickLoader {
   /// directory inside it.
   Future<Directory> _resolveBricksRoot() async {
     final extractDir = Directory(p.join(cacheDir.path, cacheKey));
-    if (extractDir.existsSync()) {
-      final cacheBricksDir = _findBricksDir(extractDir);
+    if (await extractDir.exists()) {
+      final cacheBricksDir = await _findBricksDir(extractDir);
       logger.detail(_messages.template.usingCachedDetail(path: cacheBricksDir.path));
       return cacheBricksDir;
     }
@@ -180,7 +180,7 @@ class RemoteBrickLoader extends BrickLoader {
       // 解压完成（无论成败）后清理临时 zip，避免 systemTemp 堆积。
       await downloaded.dispose();
     }
-    final bricksDir = _findBricksDir(extractDir);
+    final bricksDir = await _findBricksDir(extractDir);
     return bricksDir;
   }
 
@@ -188,10 +188,11 @@ class RemoteBrickLoader extends BrickLoader {
   ///
   /// Locates the `bricks` directory within the extracted tree, tolerating a
   /// top-level repository folder created by some zip archives.
-  Directory _findBricksDir(Directory root) {
+  Future<Directory> _findBricksDir(Directory root) async {
     final direct = Directory(p.join(root.path, 'bricks'));
-    if (direct.existsSync()) return direct;
-    for (final entity in root.listSync(recursive: true)) {
+    if (await direct.exists()) return direct;
+    final entities = await root.list(recursive: true).toList();
+    for (final entity in entities) {
       if (entity is Directory && p.basename(entity.path) == 'bricks') {
         return entity;
       }

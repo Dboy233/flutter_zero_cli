@@ -6,7 +6,7 @@ import 'package:mason_logger/mason_logger.dart';
 /// 在执行某一步骤期间显示一个旋转 spinner（表示「正在执行」），完成后将
 /// spinner 替换为 ✓ 完成标记；异常时替换为 ✗ 失败标记并向上抛出。
 ///
-/// 可见性完全由 [logger.level] 决定，无需再传入独立的策略对象：
+/// 可见性完全由 [Logger.level] 决定，无需再传入独立的策略对象：
 /// - [Level.verbose]（`--log` 调试模式）：不显示 spinner，子进程输出已实时
 ///   透传、过程靠日志展示，故这里仅打印一行步骤日志后直接执行 [work]；
 /// - 非交互终端（`stdout.hasTerminal` 为 false，如 CI / 重定向）：同样不显示
@@ -19,32 +19,53 @@ import 'package:mason_logger/mason_logger.dart';
 /// [Logger.err] / [Logger.warn]（走 stderr）；不要在 spinner 动画期间调用
 /// [Logger.info] / [Logger.success]（走 stdout 且换行），否则会破坏 spinner
 /// 所在行。需要向用户展示的总结性 [Logger.info] / [Logger.success] 应放到
-/// [runWithSpinner] 调用结束之后。
+/// [run] 调用结束之后。
 ///
 /// Shows a spinning [Progress] while [work] runs; replaces it with a
 /// completion / failure marker. Falls back to running [work] directly when
 /// no spinner should be shown (debug mode or non-terminal).
-Future<T> runWithSpinner<T>({
-  required Logger logger,
-  required Translations translations,
-  required String message,
-  required Future<T> Function() work,
-}) async {
-  // 调试模式（已有实时子进程输出）或非交互终端：直接执行，不渲染 spinner。
-  if (logger.level == Level.verbose || !stdout.hasTerminal) {
-    logger.info('\n$message');
-    return work();
-  }
+class SpinnerRunner {
+  /// 创建 spinner 执行器。
+  ///
+  /// [logger] / [translations] 为命令级固定注入，所有步骤共用。
+  ///
+  /// Creates the spinner runner. [logger] / [translations] are the
+  /// command-level fixed injections shared across steps.
+  SpinnerRunner({required this.logger, required this.translations});
 
-  final progress = logger.progress(message);
-  try {
-    final result = await work();
-    final label = message.trim().replaceFirst(RegExp(r'\.\.\.$'), '');
-    progress.complete(translations.spinner.stepCompleted(label: label));
-    return result;
-  } on Object {
-    final label = message.trim().replaceFirst(RegExp(r'\.\.\.$'), '');
-    progress.fail(translations.spinner.stepFailed(label: label));
-    rethrow;
+  /// 日志器（可见性由此决定）。
+  ///
+  /// Logger (its level decides visibility).
+  final Logger logger;
+
+  /// 本地化消息（完成 / 失败标记文案）。
+  ///
+  /// Localized messages (completion / failure markers).
+  final Translations translations;
+
+  /// 执行 [work]，期间按需渲染 spinner；返回 [work] 的结果。
+  ///
+  /// Runs [work] showing a spinner when appropriate and returns its result.
+  Future<T> run<T>({
+    required String message,
+    required Future<T> Function() work,
+  }) async {
+    // 调试模式（已有实时子进程输出）或非交互终端：直接执行，不渲染 spinner。
+    if (logger.level == Level.verbose || !stdout.hasTerminal) {
+      logger.info('\n$message');
+      return work();
+    }
+
+    final progress = logger.progress(message);
+    try {
+      final result = await work();
+      final label = message.trim().replaceFirst(RegExp(r'\.\.\.$'), '');
+      progress.complete(translations.spinner.stepCompleted(label: label));
+      return result;
+    } on Object {
+      final label = message.trim().replaceFirst(RegExp(r'\.\.\.$'), '');
+      progress.fail(translations.spinner.stepFailed(label: label));
+      rethrow;
+    }
   }
 }

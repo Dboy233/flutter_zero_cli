@@ -73,13 +73,12 @@ class _CacheListCommand extends Command<int> {
 
   @override
   Future<int> run() async {
-    if (!_cacheDir.existsSync()) {
+    if (!await _cacheDir.exists()) {
       _logger.info(_messages.cache.noneNotExist);
       return 0;
     }
 
-    final versions = _cacheDir
-        .listSync()
+    final versions = (await _cacheDir.list().toList())
         .whereType<Directory>()
         .map((d) => p.basename(d.path))
         .toList()
@@ -114,12 +113,13 @@ class _CacheCleanCommand extends Command<int> {
 
   @override
   Future<int> run() async {
-    if (!_cacheDir.existsSync()) {
+    if (!await _cacheDir.exists()) {
       _logger.info(_messages.cache.cleanNotExist);
       return 0;
     }
 
-    final versionDirs = _cacheDir.listSync().whereType<Directory>().toList();
+    final versionDirs =
+        (await _cacheDir.list().toList()).whereType<Directory>().toList();
     if (versionDirs.isEmpty) {
       _logger.info(_messages.cache.cleanNone);
       return 0;
@@ -128,7 +128,7 @@ class _CacheCleanCommand extends Command<int> {
     var removed = 0;
     for (final dir in versionDirs) {
       try {
-        dir.deleteSync(recursive: true);
+        await dir.delete(recursive: true);
         removed++;
       } on Object catch (e) {
         _logger.warn(_messages.cache.deleteFailed(name: p.basename(dir.path), error: e));

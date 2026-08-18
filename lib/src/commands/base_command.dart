@@ -4,7 +4,7 @@
 // 基类不假设任何「版本 / 适配器 / 启动提示」语义：
 //  - 版本差异交给子类（[AdapterCommand] 按模板版本选适配器，其余命令直接实现
 //    [execute]）；
-//  - 「启动版本检查提示」这一横切关注点已抽离为独立顶层函数 [ensureUpdateNotified]，
+//  - 「启动版本检查提示」这一横切关注点已抽离为独立类 [VersionUpdateNotifier]，
 //    由各命令在 [execute] 中显式 opt-in 调用，避免基类强塞导致不需要提示的命令
 //    （如 `version` 自身会双查）被迫执行。
 // 命令入口零版本硬编码。
@@ -16,7 +16,7 @@
 // about versions/adapters/startup-hints: version differences are left to
 // subclasses ([AdapterCommand] picks an adapter by template version); the
 // "startup version-check notice" cross-cutting concern is extracted into the
-// standalone top-level [ensureUpdateNotified], which each command opts into
+// standalone class [VersionUpdateNotifier], which each command opts into
 // explicitly from [execute] so commands that must not notify (e.g. `version`,
 // which runs its own check) are never forced to.
 
@@ -42,14 +42,14 @@ abstract class BaseCommand<C> extends Command<int> {
   ///
   /// [logger] / [messages] / [versionCheckService] 为必填：外部（[Fluzer]）统一注入，
   /// 不再各自兜底默认值，避免子类与基类双重默认。[versionCheckService] 供需要
-  /// 启动版本提示的命令在 [execute] 中显式调用 [ensureUpdateNotified]。
+  /// 启动版本提示的命令在 [execute] 中显式调用 [VersionUpdateNotifier]。
   ///
   /// Creates the base command.
   ///
   /// [logger] / [messages] / [versionCheckService] are required: the external
   /// [Fluzer] injects them once so no fallback default lives in the base, which
   /// avoids the subclass/base double-default. [versionCheckService] is retained so
-  /// commands that opt into the startup notice can call [ensureUpdateNotified].
+  /// commands that opt into the startup notice can call [VersionUpdateNotifier].
   BaseCommand({
     required this.logger,
     required this.translations,
@@ -57,7 +57,7 @@ abstract class BaseCommand<C> extends Command<int> {
     this.workingDirectory,
   });
 
-  /// 日志器（命令构造注入；供 [execute] 中显式调用 [ensureUpdateNotified]）。
+  /// 日志器（命令构造注入；供 [execute] 中显式调用 [VersionUpdateNotifier]）。
   final Logger logger;
 
   /// 本地化消息（命令构造注入）。
@@ -97,13 +97,13 @@ abstract class BaseCommand<C> extends Command<int> {
 
   /// 执行本命令（上下文已就绪）。
   ///
-  /// 需要启动版本提示的命令应在此开头显式调用 [ensureUpdateNotified]（见各
+  /// 需要启动版本提示的命令应在此开头显式调用 [VersionUpdateNotifier]（见各
   /// 命令子类）；不需要的命令（如 [VersionCommand] 自身执行检查）则直接执行。
   ///
   /// Executes this command (context already built).
   ///
   /// Commands that want the startup version notice should call
-  /// [ensureUpdateNotified] at the start (see command subclasses); commands
+  /// [VersionUpdateNotifier] at the start (see command subclasses); commands
   /// that don't (e.g. [VersionCommand] runs its own check) just execute.
   Future<int> execute(C ctx);
 }

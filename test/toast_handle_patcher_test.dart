@@ -81,6 +81,27 @@ bool defaultToastHandle(BuildContext context, UIEffect effect) {
 }
 ''';
 
+/// 模板态 handle，但开发者将 `BuildContext` 形参命名为 `ctx`（非约定 `context`）。
+const _renamedContextSource = '''
+import 'package:flutter/material.dart';
+
+bool defaultToastHandle(BuildContext ctx, UIEffect effect) {
+  if (effect is! ToastEffect) return false;
+
+  final svc = getIt<ToastService>();
+  if (effect.message != null) {
+    svc.showInfo(effect.message!);
+  } else if (effect.l10nCode != null) {
+    // l10nCode 是开发者自定义键，必须由业务 handle 解析。
+    assert(() {
+      debugPrint('Unhandled ToastEffect.l10nCode: \${effect.l10nCode}.');
+      return true;
+    }(), 'l10nCode must be resolved by a business EffectHandle');
+  }
+  return true;
+}
+''';
+
 void main() {
   late Directory tempDir;
   late File handleFile;
@@ -192,6 +213,20 @@ bool defaultToastHandle(BuildContext context, UIEffect effect) {
       final outcome = await patcher.patch(handleFile);
 
       expect(outcome.result, ToastHandlePatchResult.patched);
+    });
+
+    test('BuildContext 形参被重命名（如 ctx）→ 复用真实形参名，不硬编码 context',
+        () async {
+      handleFile.writeAsStringSync(_renamedContextSource);
+
+      final outcome = await patcher.patch(handleFile);
+
+      expect(outcome.result, ToastHandlePatchResult.patched);
+      final patched = handleFile.readAsStringSync();
+      // 接线代码引用真实的形参名 `ctx`，而非非法未定义的 `context`
+      expect(patched, contains('L10nToastEffectHelper.showToastFromL10nCode('));
+      expect(patched, contains('ctx,'));
+      expect(patched, isNot(contains('context,')));
     });
   });
 

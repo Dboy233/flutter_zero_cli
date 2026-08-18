@@ -46,9 +46,9 @@ VersionCheckService get _noopVersionCheckService => _NoopVersionCheckService();
 
 class _NoopVersionCheckService extends VersionCheckService {
   @override
-  VersionCheckResult? peekCachedUpdate({
+  Future<VersionCheckResult?> peekCachedUpdate({
     String packageName = cliPackageName,
-  }) =>
+  }) async =>
       null;
 
   @override

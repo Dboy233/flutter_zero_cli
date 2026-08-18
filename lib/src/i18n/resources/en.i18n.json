@@ -35,7 +35,6 @@
     "description": "Add a new feature module",
     "nameRequired": "Error: please specify a feature name",
     "featureNameEmpty": "Feature name cannot be empty.",
-    "buildRunnerHelp": "Whether to run build_runner after generation",
     "step1Load": "load project config",
     "step2Template": "resolve template loader (local or remote download)",
     "step3Generate": "generate feature module $feature",
@@ -47,7 +46,6 @@
     "buildRunnerCompleted": "build_runner completed.",
     "generationFailed": "Generation failed: $error",
     "successCreated": "Feature module $feature has been created and registered in DI.",
-    "skipBuildRunner": "Skipped build_runner; run it manually with:\n  dart run build_runner build",
     "featureExists": "Feature module $feature already exists.",
     "featureNameInvalid": "Feature name must be snake_case and start with a lowercase letter, e.g. user_profile."
   },

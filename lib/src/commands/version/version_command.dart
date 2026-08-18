@@ -44,10 +44,11 @@ class VersionCommand extends BaseCommand<VersionCommandContext> {
     logger.info('fluzer $cliVersion');
 
     // 版本校验涉及 pub.dev 网络请求，用 spinner 体现等待过程；
-    // --log 模式下 runWithSpinner 不显示 spinner，改为直接执行。
-    final result = await runWithSpinner<VersionCheckResult>(
+    // --log 模式下 SpinnerRunner 不显示 spinner，改为直接执行。
+    final result = await SpinnerRunner(
       logger: logger,
       translations: translations,
+    ).run<VersionCheckResult>(
       message: translations.version.checking,
       work: () => versionCheckService.checkForUpdate(),
     );

@@ -5,7 +5,7 @@ import 'package:test/test.dart';
 
 /// 捕获 [Logger.info] 输出，用于断言 [StepRunner] 自动拼上的「步骤 i/N」前缀。
 ///
-/// 测试环境下 [stdout.hasTerminal] 为 false，[runWithSpinner] 走非 spinner 分支
+/// 测试环境下 [stdout.hasTerminal] 为 false，[SpinnerRunner] 走非 spinner 分支
 /// 直接调用 [Logger.info]，因此重写 [info] 即可截获步骤文案。
 class _RecordingLogger extends Logger {
   final List<String> infos = [];
@@ -54,12 +54,12 @@ void main() {
       steps.add(
         'A',
         () async => order.add('workA'),
-        onDone: () => order.add('doneA'),
+        onDone: (_) => order.add('doneA'),
       );
       steps.add(
         'B',
         () async => order.add('workB'),
-        onDone: () => order.add('doneB'),
+        onDone: (_) => order.add('doneB'),
       );
 
       await steps.runAll();
@@ -78,6 +78,54 @@ void main() {
       expect(logger.infos, hasLength(2));
       expect(logger.infos[0], contains('步骤 1/2'));
       expect(logger.infos[1], contains('步骤 2/2')); // C 因 B 跳过而变为 2/2
+    });
+
+    test('work 的返回值作为入参传给 onDone', () async {
+      String? received;
+      steps.add<String>(
+        'A',
+        () async => 'payload',
+        onDone: (result) => received = result,
+      );
+
+      await steps.runAll();
+
+      expect(received, 'payload');
+    });
+
+    test('work 抛异常时 onDone 不被调用', () async {
+      var doneCalled = false;
+      steps.add<String>(
+        'A',
+        () async => throw StateError('boom'),
+        onDone: (_) => doneCalled = true,
+      );
+
+      expect(() async => steps.runAll(), throwsA(isA<StateError>()));
+      expect(doneCalled, isFalse);
+    });
+
+    test('onDone 为 null 时不报错，work 照常执行', () async {
+      steps.add('A', () async => order.add('workA'));
+
+      await steps.runAll();
+
+      expect(order, ['workA']);
+    });
+
+    test('enabled=false 时 work 与 onDone 均不执行', () async {
+      var doneCalled = false;
+      steps.add(
+        'A',
+        () async => order.add('workA'),
+        onDone: (_) => doneCalled = true,
+        enabled: false,
+      );
+
+      await steps.runAll();
+
+      expect(order, isEmpty);
+      expect(doneCalled, isFalse);
     });
   });
 }

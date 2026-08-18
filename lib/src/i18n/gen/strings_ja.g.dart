@@ -109,7 +109,6 @@ class _Translations$feature$ja implements Translations$feature$zh {
 	@override String get description => '新規機能モジュールを追加';
 	@override String get nameRequired => 'エラー：機能名を指定してください';
 	@override String get featureNameEmpty => '機能名は空にできません。';
-	@override String get buildRunnerHelp => '生成後に build_runner を実行するか';
 	@override String get step1Load => 'プロジェクト設定を読み込み';
 	@override String get step2Template => 'テンプレートローダーを解決（ローカルまたはリモート）';
 	@override String step3Generate({required Object feature}) => '機能モジュール ${feature} を生成';
@@ -121,7 +120,6 @@ class _Translations$feature$ja implements Translations$feature$zh {
 	@override String get buildRunnerCompleted => 'build_runner の実行が完了しました。';
 	@override String generationFailed({required Object error}) => '生成失敗: ${error}';
 	@override String successCreated({required Object feature}) => '機能モジュール ${feature} を作成し、DI に登録しました。';
-	@override String get skipBuildRunner => 'build_runner をスキップしました。手動で実行：\n  dart run build_runner build';
 	@override String featureExists({required Object feature}) => '機能モジュール ${feature} は既に存在します。';
 	@override String get featureNameInvalid => '機能名は snake_case で、かつ小文字の英字で始まる必要があります（例: user_profile）。';
 }
@@ -343,7 +341,6 @@ extension on TranslationsJa {
 			'feature.description' => '新規機能モジュールを追加',
 			'feature.nameRequired' => 'エラー：機能名を指定してください',
 			'feature.featureNameEmpty' => '機能名は空にできません。',
-			'feature.buildRunnerHelp' => '生成後に build_runner を実行するか',
 			'feature.step1Load' => 'プロジェクト設定を読み込み',
 			'feature.step2Template' => 'テンプレートローダーを解決（ローカルまたはリモート）',
 			'feature.step3Generate' => ({required Object feature}) => '機能モジュール ${feature} を生成',
@@ -355,7 +352,6 @@ extension on TranslationsJa {
 			'feature.buildRunnerCompleted' => 'build_runner の実行が完了しました。',
 			'feature.generationFailed' => ({required Object error}) => '生成失敗: ${error}',
 			'feature.successCreated' => ({required Object feature}) => '機能モジュール ${feature} を作成し、DI に登録しました。',
-			'feature.skipBuildRunner' => 'build_runner をスキップしました。手動で実行：\n  dart run build_runner build',
 			'feature.featureExists' => ({required Object feature}) => '機能モジュール ${feature} は既に存在します。',
 			'feature.featureNameInvalid' => '機能名は snake_case で、かつ小文字の英字で始まる必要があります（例: user_profile）。',
 			'genL10n.description' => '国際化コードを生成し L10nCode クラスを自動作成',

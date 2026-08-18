@@ -8,11 +8,11 @@ import 'package:fluzer/src/commands/command_context.dart';
 
 /// `new` 命令上下文。
 ///
-/// 在基类 [CommandContext] 之上补充功能名与 build_runner 开关。
+/// 在基类 [CommandContext] 之上补充功能名。
 ///
 /// `new` command context.
 ///
-/// Adds the feature name and the build-runner toggle on top of [CommandContext].
+/// Adds the feature name on top of [CommandContext].
 class NewCommandContext extends CommandContext {
   /// 创建上下文。
   ///

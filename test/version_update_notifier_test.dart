@@ -1,18 +1,21 @@
-// 启动版本提示单元测试 / Unit tests for ensureUpdateNotified.
+// 启动版本提示单元测试 / Unit tests for VersionUpdateNotifier.
 //
-// 通过 spy service 验证分支逻辑：缓存命中走 peek 快路径（不触网），
-// 缓存未命中才调用注入的检查服务；两条路径均不抛异常、不阻断调用方。
+// 通过 spy service 验证分支逻辑：缓存命中走 peek 快路径（不触网、不注册步骤），
+// 缓存未命中则向 StepRunner 注册检查步骤，直到 runAll 才真正调用检查服务；
+// 两条路径均不抛异常、不阻断调用方。
 //
-// 原 [VersionCheckMixin.ensureUpdateNotified] 已抽离为独立顶层函数，本文件
-// 随之改为测试该函数。
+// 注意：notify 只负责「注册」，因此断言前必须先 await steps.runAll()，否则
+// 缓存未命中分支的检查服务不会被调用。
 //
 // Uses a spy service to verify branching: a cache hit takes the peek fast
-// path (no network call), while a cache miss invokes the injected service.
+// path (no network call, no step registered), while a cache miss registers a
+// step that only invokes the injected service once runAll executes.
 
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:fluzer/src/i18n/gen/strings.g.dart';
+import 'package:fluzer/src/util/step_runner.dart';
 import 'package:fluzer/src/version/version_check.dart';
 import 'package:fluzer/src/version/version_update_notifier.dart';
 import 'package:mason_logger/mason_logger.dart';
@@ -36,7 +39,7 @@ class _SpyVersionCheckService extends VersionCheckService {
 }
 
 void main() {
-  group('ensureUpdateNotified', () {
+  group('VersionUpdateNotifier.notify', () {
     late Directory cacheDir;
     late File cacheFile;
 
@@ -50,7 +53,7 @@ void main() {
       if (cacheFile.existsSync()) cacheFile.deleteSync();
     });
 
-    test('缓存未命中 + 有更新 → 调用检查服务且不抛异常', () async {
+    test('缓存未命中 + 有更新 → runAll 后调用检查服务且不抛异常', () async {
       var called = false;
       final logger = Logger(level: Level.quiet);
       final service = _SpyVersionCheckService(
@@ -65,15 +68,23 @@ void main() {
         },
         logger: logger,
       );
-      await ensureUpdateNotified(
+      final steps = StepRunner(
+        logger: logger,
+        translations: AppLocale.zh.buildSync(),
+      );
+      await VersionUpdateNotifier(
         logger: logger,
         translations: AppLocale.zh.buildSync(),
         versionCheckService: service,
-      );
+      ).notify(steps);
+      // notify 只注册步骤，此时尚未触网
+      expect(called, isFalse);
+
+      await steps.runAll();
       expect(called, isTrue);
     });
 
-    test('缓存未命中 + 不可用 → 调用检查服务且不抛异常', () async {
+    test('缓存未命中 + 不可用 → runAll 后调用检查服务且不抛异常', () async {
       var called = false;
       final logger = Logger(level: Level.quiet);
       final service = _SpyVersionCheckService(
@@ -86,15 +97,21 @@ void main() {
         },
         logger: logger,
       );
-      await ensureUpdateNotified(
+      final steps = StepRunner(
+        logger: logger,
+        translations: AppLocale.zh.buildSync(),
+      );
+      await VersionUpdateNotifier(
         logger: logger,
         translations: AppLocale.zh.buildSync(),
         versionCheckService: service,
-      );
+      ).notify(steps);
+
+      await steps.runAll();
       expect(called, isTrue);
     });
 
-    test('缓存命中且有更新 → 走 peek 快路径，不调用检查服务', () async {
+    test('缓存命中且有更新 → 走 peek 快路径，不注册步骤、不调用检查服务', () async {
       cacheDir.createSync(recursive: true);
       cacheFile.writeAsStringSync(jsonEncode({
         'fluzer': {
@@ -112,15 +129,21 @@ void main() {
         },
         logger: logger,
       );
-      await ensureUpdateNotified(
+      final steps = StepRunner(
+        logger: logger,
+        translations: AppLocale.zh.buildSync(),
+      );
+      await VersionUpdateNotifier(
         logger: logger,
         translations: AppLocale.zh.buildSync(),
         versionCheckService: service,
-      );
+      ).notify(steps);
+      // 未注册任何步骤，runAll 为空操作，不会触网
+      await steps.runAll();
       expect(called, isFalse);
     });
 
-    test('缓存命中但不可用 → 不调用检查服务', () async {
+    test('缓存命中但不可用 → 不注册步骤、不调用检查服务', () async {
       cacheDir.createSync(recursive: true);
       cacheFile.writeAsStringSync(jsonEncode({
         'fluzer': {
@@ -138,11 +161,16 @@ void main() {
         },
         logger: logger,
       );
-      await ensureUpdateNotified(
+      final steps = StepRunner(
+        logger: logger,
+        translations: AppLocale.zh.buildSync(),
+      );
+      await VersionUpdateNotifier(
         logger: logger,
         translations: AppLocale.zh.buildSync(),
         versionCheckService: service,
-      );
+      ).notify(steps);
+      await steps.runAll();
       expect(called, isFalse);
     });
   });

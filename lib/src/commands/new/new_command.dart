@@ -7,7 +7,6 @@ import 'package:fluzer/src/commands/new/new_context.dart';
 import 'package:fluzer/src/process/process_runner.dart';
 import 'package:fluzer/src/template/brick_loader.dart';
 import 'package:fluzer/src/template/template_version_reader.dart';
-import 'package:fluzer/src/version/version_update_notifier.dart';
 
 /// `new` 命令：在当前 flutter_zero 模板项目中生成功能模块。
 ///
@@ -67,18 +66,6 @@ class NewCommand extends AdapterCommand<NewCommandContext> {
   }
 
   @override
-  Future<int> execute(NewCommandContext ctx) async {
-    // 启动版本检查提示（仅在项目内执行的 new 命令显式 opt-in；缓存命中瞬时提示，
-    // 缓存未命中以 spinner 包裹网络等待；无更新 / 网络异常静默降级，不阻断主流程）。
-    await ensureUpdateNotified(
-      logger: logger,
-      translations: translations,
-      versionCheckService: versionCheckService,
-    );
-    return super.execute(ctx);
-  }
-
-  @override
   List<CommandAdapter<NewCommandContext>> get adapters => [
     NewV1V2Adapter(deps: _newDeps),
   ];
@@ -89,5 +76,6 @@ class NewCommand extends AdapterCommand<NewCommandContext> {
     loader: _loader,
     processRunner: processRunner,
     workingDirectory: workingDirectory,
+    versionCheckService: versionCheckService
   );
 }

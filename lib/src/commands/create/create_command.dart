@@ -12,11 +12,11 @@ import 'package:path/path.dart' as p;
 import '../../commands/base_command.dart';
 import '../../commands/create/create_context.dart';
 import '../../config/project_config.dart';
-import '../../util/step_runner.dart';
 import '../../process/process_runner.dart';
 import '../../template/brick_loader.dart';
 import '../../template/brick_renderer.dart';
 import '../../template/template_source.dart';
+import '../../util/step_runner.dart';
 import '../../version/version_update_notifier.dart';
 
 /// create 命令：从模板创建全新的 Flutter 项目。
@@ -99,11 +99,7 @@ class CreateCommand extends BaseCommand<CreateCommandContext> {
   Future<int> execute(CreateCommandContext ctx) async {
     // 启动版本检查提示（create 命令显式 opt-in；缓存命中瞬时提示，
     // 缓存未命中以 spinner 包裹网络等待；无更新 / 网络异常静默降级，不阻断主流程）。
-    await ensureUpdateNotified(
-      logger: logger,
-      translations: translations,
-      versionCheckService: versionCheckService,
-    );
+
     final projectName = ctx.projectName;
     if (projectName.isEmpty) {
       logger.err(translations.create.nameRequired);
@@ -122,6 +118,13 @@ class CreateCommand extends BaseCommand<CreateCommandContext> {
 
     final steps = StepRunner(logger: logger, translations: translations);
 
+
+    await VersionUpdateNotifier(
+      logger: logger,
+      translations: translations,
+      versionCheckService: versionCheckService,
+    ).notify(steps);
+
     // 1. 校验项目名与目录
     steps.add(translations.create.step1Validate, () async {
       if (!_isValidProjectName(projectName)) {
@@ -135,7 +138,7 @@ class CreateCommand extends BaseCommand<CreateCommandContext> {
       // 该目录是用户既有数据，捕获方据此跳过清理，绝不删除它。
       // 后续若新增「跳过存在性检查」的选项（如 --force），
       // 需同步确认清理路径不会误删用户原有目录。
-      if (Directory(targetDir).existsSync()) {
+      if (await Directory(targetDir).exists()) {
         throw DirExistsException(
           translations.create.dirExists(name: projectName),
         );
@@ -171,7 +174,7 @@ class CreateCommand extends BaseCommand<CreateCommandContext> {
 
     // 4. 清理 flutter create 生成的多余测试文件
     steps.add(translations.create.step4CleanTest, () async {
-      _cleanTests(targetDir);
+      await _cleanTests(targetDir);
     });
 
     // 5. 执行 flutter pub get
@@ -200,15 +203,15 @@ class CreateCommand extends BaseCommand<CreateCommandContext> {
     } on CliException catch (e) {
       logger.err(e.message);
       // 清理本次命令创建的半成品目录
-      _cleanupOnFailure(targetDir);
+      await _cleanupOnFailure(targetDir);
       return 1;
     } on ProcessException catch (e) {
       logger.err(translations.create.flutterNotFound(error: e.message));
-      _cleanupOnFailure(targetDir);
+      await _cleanupOnFailure(targetDir);
       return 1;
     } on Object catch (e) {
       logger.err(translations.create.failed(error: e));
-      _cleanupOnFailure(targetDir);
+      await _cleanupOnFailure(targetDir);
       return 1;
     }
   }
@@ -266,11 +269,11 @@ class CreateCommand extends BaseCommand<CreateCommandContext> {
   /// `flutter create .` auto-generates a default `widget_test.dart`
   /// in the test/ directory, but the template already includes
   /// `home_page_test.dart`. This default test file should be removed.
-  void _cleanTests(String targetDir) {
+  Future<void> _cleanTests(String targetDir) async {
     final widgetTest = File(p.join(targetDir, 'test', 'widget_test.dart'));
-    if (widgetTest.existsSync()) {
+    if (await widgetTest.exists()) {
       try {
-        widgetTest.deleteSync();
+        await widgetTest.delete();
         logger.detail(translations.create.removedWidgetTest);
       } on Object catch (e) {
         logger.detail(translations.create.removeWidgetTestFailed(error: e));
@@ -290,11 +293,11 @@ class CreateCommand extends BaseCommand<CreateCommandContext> {
   /// is allowed. Callers must ensure the directory was created by this run;
   /// pre-existing user directories are handled by the [DirExistsException]
   /// branch and never reach this method.
-  void _cleanupOnFailure(String targetDir) {
+  Future<void> _cleanupOnFailure(String targetDir) async {
     final dir = Directory(targetDir);
-    if (dir.existsSync()) {
+    if (await dir.exists()) {
       try {
-        dir.deleteSync(recursive: true);
+        await dir.delete(recursive: true);
         logger.detail(translations.create.cleanedFailedDir);
       } on Object catch (e) {
         logger.detail(translations.create.cleanupFailedDir(error: e));

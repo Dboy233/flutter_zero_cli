@@ -174,9 +174,6 @@ class Translations$feature$zh {
 	/// zh: '功能名不能为空。'
 	String get featureNameEmpty => '功能名不能为空。';
 
-	/// zh: '生成后是否运行 build_runner'
-	String get buildRunnerHelp => '生成后是否运行 build_runner';
-
 	/// zh: '加载项目配置'
 	String get step1Load => '加载项目配置';
 
@@ -209,9 +206,6 @@ class Translations$feature$zh {
 
 	/// zh: '功能模块 $feature 已创建并注册到 DI。'
 	String successCreated({required Object feature}) => '功能模块 ${feature} 已创建并注册到 DI。';
-
-	/// zh: '跳过 build_runner，可手动运行： dart run build_runner build'
-	String get skipBuildRunner => '跳过 build_runner，可手动运行：\n  dart run build_runner build';
 
 	/// zh: '功能模块 $feature 已存在。'
 	String featureExists({required Object feature}) => '功能模块 ${feature} 已存在。';
@@ -613,7 +607,6 @@ extension on Translations {
 			'feature.description' => '新增功能模块',
 			'feature.nameRequired' => '错误：请指定功能名',
 			'feature.featureNameEmpty' => '功能名不能为空。',
-			'feature.buildRunnerHelp' => '生成后是否运行 build_runner',
 			'feature.step1Load' => '加载项目配置',
 			'feature.step2Template' => '解析模板加载器（本地或远程下载）',
 			'feature.step3Generate' => ({required Object feature}) => '生成功能模块 ${feature}',
@@ -625,7 +618,6 @@ extension on Translations {
 			'feature.buildRunnerCompleted' => 'build_runner 执行完成。',
 			'feature.generationFailed' => ({required Object error}) => '生成失败：${error}',
 			'feature.successCreated' => ({required Object feature}) => '功能模块 ${feature} 已创建并注册到 DI。',
-			'feature.skipBuildRunner' => '跳过 build_runner，可手动运行：\n  dart run build_runner build',
 			'feature.featureExists' => ({required Object feature}) => '功能模块 ${feature} 已存在。',
 			'feature.featureNameInvalid' => '功能名必须是 snake_case 且以小写字母开头，例如 user_profile。',
 			'genL10n.description' => '生成国际化代码并自动创建 L10nCode 类',

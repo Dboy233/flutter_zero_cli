@@ -35,7 +35,6 @@
     "description": "新規機能モジュールを追加",
     "nameRequired": "エラー：機能名を指定してください",
     "featureNameEmpty": "機能名は空にできません。",
-    "buildRunnerHelp": "生成後に build_runner を実行するか",
     "step1Load": "プロジェクト設定を読み込み",
     "step2Template": "テンプレートローダーを解決（ローカルまたはリモート）",
     "step3Generate": "機能モジュール $feature を生成",
@@ -47,7 +46,6 @@
     "buildRunnerCompleted": "build_runner の実行が完了しました。",
     "generationFailed": "生成失敗: $error",
     "successCreated": "機能モジュール $feature を作成し、DI に登録しました。",
-    "skipBuildRunner": "build_runner をスキップしました。手動で実行：\n  dart run build_runner build",
     "featureExists": "機能モジュール $feature は既に存在します。",
     "featureNameInvalid": "機能名は snake_case で、かつ小文字の英字で始まる必要があります（例: user_profile）。"
   },
