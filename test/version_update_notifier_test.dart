@@ -27,7 +27,11 @@ import 'package:test/test.dart';
 /// Spy version-check service that injects a callback for call tracking
 /// while keeping real cache I/O from the parent class.
 class _SpyVersionCheckService extends VersionCheckService {
-  _SpyVersionCheckService(this._onCheck, {super.logger});
+  _SpyVersionCheckService(
+    this._onCheck, {
+    super.logger,
+    super.cacheDir,
+  });
 
   final Future<VersionCheckResult> Function() _onCheck;
 
@@ -44,13 +48,12 @@ void main() {
     late File cacheFile;
 
     setUp(() {
-      cacheDir = Directory(p.join(Directory.systemTemp.path, 'fluzer_cache'));
+      cacheDir = Directory.systemTemp.createTempSync('vnotif_');
       cacheFile = File(p.join(cacheDir.path, 'version_check.json'));
-      if (cacheFile.existsSync()) cacheFile.deleteSync();
     });
 
     tearDown(() {
-      if (cacheFile.existsSync()) cacheFile.deleteSync();
+      if (cacheDir.existsSync()) cacheDir.deleteSync(recursive: true);
     });
 
     test('缓存未命中 + 有更新 → runAll 后调用检查服务且不抛异常', () async {
@@ -67,6 +70,7 @@ void main() {
           );
         },
         logger: logger,
+        cacheDir: cacheDir,
       );
       final steps = StepRunner(
         logger: logger,
@@ -96,6 +100,7 @@ void main() {
           );
         },
         logger: logger,
+        cacheDir: cacheDir,
       );
       final steps = StepRunner(
         logger: logger,
@@ -128,6 +133,7 @@ void main() {
           throw StateError('不应被调用 / should not be called');
         },
         logger: logger,
+        cacheDir: cacheDir,
       );
       final steps = StepRunner(
         logger: logger,
@@ -160,6 +166,7 @@ void main() {
           throw StateError('不应被调用 / should not be called');
         },
         logger: logger,
+        cacheDir: cacheDir,
       );
       final steps = StepRunner(
         logger: logger,

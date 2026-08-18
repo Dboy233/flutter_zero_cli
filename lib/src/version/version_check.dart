@@ -111,14 +111,20 @@ class VersionCacheEntry {
 /// [logger] and [dio] are constructor-injected (DIP); once constructed, every
 /// method has direct access to the shared dependencies.
 class VersionCheckService {
-  VersionCheckService({Logger? logger, Dio? dio, Translations? messages})
-    : _logger = logger ?? Logger(),
-      _dio = dio ?? Dio(),
-      _messages = messages ?? AppLocale.zh.buildSync();
+  VersionCheckService({
+    Logger? logger,
+    Dio? dio,
+    Translations? messages,
+    Directory? cacheDir,
+  }) : _logger = logger ?? Logger(),
+       _dio = dio ?? Dio(),
+       _messages = messages ?? AppLocale.zh.buildSync(),
+       _cacheDirOverride = cacheDir;
 
   final Logger _logger;
   final Dio _dio;
   final Translations _messages;
+  final Directory? _cacheDirOverride;
 
   // ---- 公共 API ----
 
@@ -248,7 +254,8 @@ class VersionCheckService {
 
   // ---- 私有：缓存 I/O ----
 
-  String get _cacheDir => '${Directory.systemTemp.path}/$cacheDirName';
+  String get _cacheDir =>
+      _cacheDirOverride?.path ?? '${Directory.systemTemp.path}/$cacheDirName';
 
   String get _cacheFile => '$_cacheDir/version_check.json';
 
@@ -256,8 +263,7 @@ class VersionCheckService {
     try {
       final file = File(_cacheFile);
       if (!await file.exists()) return {};
-      final raw = jsonDecode(await file.readAsString())
-          as Map<String, dynamic>;
+      final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       return raw.map(
         (k, v) =>
             MapEntry(k, VersionCacheEntry.fromJson(v as Map<String, dynamic>)),

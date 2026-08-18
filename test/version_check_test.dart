@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:mason_logger/mason_logger.dart';
 import 'package:fluzer/src/config/template_config.dart';
 import 'package:fluzer/src/version/version_check.dart';
+import 'package:mason_logger/mason_logger.dart';
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 void main() {
@@ -53,23 +54,19 @@ void main() {
   });
 
   group('peekCachedUpdate', () {
-    late String cacheFile;
+    late Directory cacheDir;
     late VersionCheckService service;
 
     setUp(() async {
-      service = VersionCheckService(logger: Logger(level: Level.quiet));
-      cacheFile =
-          '${Directory.systemTemp.path}/$cacheDirName/version_check.json';
-      final dir = Directory('${Directory.systemTemp.path}/$cacheDirName');
-      if (await dir.exists()) {
-        final file = File(cacheFile);
-        if (await file.exists()) await file.delete();
-      }
+      cacheDir = await Directory.systemTemp.createTemp('vcheck_');
+      service = VersionCheckService(
+        logger: Logger(level: Level.quiet),
+        cacheDir: cacheDir,
+      );
     });
 
     tearDown(() async {
-      final file = File(cacheFile);
-      if (await file.exists()) await file.delete();
+      if (await cacheDir.exists()) await cacheDir.delete(recursive: true);
     });
 
     test('缓存文件不存在返回 null', () async {
@@ -77,7 +74,7 @@ void main() {
     });
 
     test('缓存命中且无更新返回 hasUpdate=false', () async {
-      await _writeTestCache({
+      await _writeTestCache(cacheDir, {
         'test_pkg': {
           'latest': '1.1.3',
           'available': true,
@@ -92,7 +89,7 @@ void main() {
     });
 
     test('缓存命中且有更新返回 hasUpdate=true', () async {
-      await _writeTestCache({
+      await _writeTestCache(cacheDir, {
         'test_pkg': {
           'latest': '999.0.0',
           'available': true,
@@ -109,7 +106,7 @@ void main() {
     test('可用缓存超过 24h 返回 null', () async {
       final old = DateTime.now().millisecondsSinceEpoch -
           (25 * 60 * 60 * 1000); // 25h
-      await _writeTestCache({
+      await _writeTestCache(cacheDir, {
         'test_pkg': {
           'latest': '999.0.0',
           'available': true,
@@ -122,7 +119,7 @@ void main() {
     test('不可用缓存未超 10min 返回 unavailable', () async {
       final recent = DateTime.now().millisecondsSinceEpoch -
           (5 * 60 * 1000); // 5min
-      await _writeTestCache({
+      await _writeTestCache(cacheDir, {
         'test_pkg': {
           'latest': null,
           'available': false,
@@ -138,7 +135,7 @@ void main() {
     test('不可用缓存超过 10min 返回 null', () async {
       final old = DateTime.now().millisecondsSinceEpoch -
           (15 * 60 * 1000); // 15min
-      await _writeTestCache({
+      await _writeTestCache(cacheDir, {
         'test_pkg': {
           'latest': null,
           'available': false,
@@ -150,8 +147,8 @@ void main() {
   });
 }
 
-Future<void> _writeTestCache(Map<String, dynamic> data) async {
-  final dir = Directory('${Directory.systemTemp.path}/$cacheDirName');
-  if (!await dir.exists()) await dir.create(recursive: true);
-  await File('${dir.path}/version_check.json').writeAsString(jsonEncode(data));
+Future<void> _writeTestCache(Directory cacheDir, Map<String, dynamic> data) async {
+  if (!await cacheDir.exists()) await cacheDir.create(recursive: true);
+  await File(p.join(cacheDir.path, 'version_check.json'))
+      .writeAsString(jsonEncode(data));
 }
