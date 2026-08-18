@@ -1,47 +1,60 @@
 // `cache` 命令：管理本地模板缓存（list / clean）。
 //
-// `cache` command: manages the local template cache (list / clean).
-//
 // 缓存根目录为 `系统临时目录/fluzer_cache`，其中每个子目录是一份按版本
 // 隔离的模板缓存（`template_<版本号>` 或 `fluzer_<url 哈希>`）。
 
 import 'dart:io';
 
+import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
 import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:mason_logger/mason_logger.dart';
 import 'package:path/path.dart' as p;
 
-import '../config/template_config.dart';
+import '../../commands/base_command.dart';
+import '../../commands/cache/cache_context.dart';
+import '../../config/template_config.dart';
 
 /// `cache` 命令：查看 / 清空本地模板缓存。
 ///
 /// `cache` command: lists or clears the local template cache.
-class CacheCommand extends Command<int> {
+class CacheCommand extends BaseCommand<CacheCommandContext> {
   /// 创建 CacheCommand 实例。
   ///
+  /// [logger] / [translations] / [versionCheckService] 由外部必填注入（[Fluzer]
+  /// 统一提供；本命令不 opt-in 启动提示，但仍持有以避免 [BaseCommand] 重复默认值）；
+  /// [cacheDir] 可选，省略时回退到系统临时目录。
+  ///
   /// Creates a CacheCommand instance.
+  ///
+  /// [logger] / [translations] / [versionCheckService] are required (injected by
+  /// [Fluzer]); this command does not opt into the startup notice but still holds
+  /// the service to avoid a base default; [cacheDir] defaults to the system temp.
   CacheCommand({
-    Logger? logger,
+    required super.logger,
+    required super.versionCheckService,
     Directory? cacheDir,
-    Translations? messages,
-  })  : _logger = logger ?? Logger(),
-        _messages = messages ?? AppLocale.zh.buildSync(),
-        _cacheDir = cacheDir ??
+    required super.translations,
+  })  : _cacheDir = cacheDir ??
             Directory(p.join(Directory.systemTemp.path, cacheDirName)) {
-    addSubcommand(_CacheListCommand(_logger, _cacheDir, _messages));
-    addSubcommand(_CacheCleanCommand(_logger, _cacheDir, _messages));
+    addSubcommand(_CacheListCommand(logger, _cacheDir, translations));
+    addSubcommand(_CacheCleanCommand(logger, _cacheDir, translations));
   }
 
-  final Logger _logger;
-  final Translations _messages;
   final Directory _cacheDir;
 
   @override
   String get name => 'cache';
 
   @override
-  String get description => _messages.cache.description;
+  String get description => translations.cache.description;
+
+  @override
+  Future<CacheCommandContext> buildContext(ArgResults args) async =>
+      const CacheCommandContext();
+
+  @override
+  Future<int> execute(CacheCommandContext ctx) async => 0;
 }
 
 /// `cache list`：列出所有已缓存的模板版本。

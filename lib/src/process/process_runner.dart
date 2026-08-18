@@ -9,42 +9,27 @@
 // - [showLive] 为 false（默认，无 --log）：子进程输出完全隐藏——仅缓冲于
 //   内存并丢弃，不打印到控制台（重定向到文件 / CI 场景同样不输出）。
 //
-// 测试可构造实例并注入 mock 实现（参见 [ProcessRunFn]），无需全局可变状态。
+// [ProcessRunner] 为抽象基类：生产用 [RealProcessRunner] 真正启动进程，
+// 测试用 FakeProcessRunner（位于 test/helpers）记录调用、不触碰真实进程。
 
 import 'dart:async';
 import 'dart:io';
 
-/// 进程执行函数签名（可执行文件 + 参数 → 退出码）。
+/// 外部进程执行器抽象基类。
 ///
-/// 与 [ProcessRunner.run] 的公开形参一致（去掉仅测试使用的 sink 形参），
-/// 允许在测试中整体替换 [ProcessRunner.run] 的实现。
+/// 统一约定：在 [workingDirectory] 下执行 [executable]（参数 [args]），
+/// 返回退出码。具体实现决定输出策略与是否真正启动进程。
 ///
-/// Signature matching [ProcessRunner.run] (minus test-only sinks), so the
-/// implementation can be swapped in tests.
-typedef ProcessRunFn =
-    Future<int> Function(
-      String executable,
-      List<String> args, {
-      String? workingDirectory,
-      bool showLive,
-      bool runInShell,
-    });
-
-/// 外部进程执行器。
+/// 生产用 [RealProcessRunner]；测试用 FakeProcessRunner（位于 test/helpers）。
 ///
-/// 统一负责：启动进程、按策略转发 stdout / stderr、返回退出码。
-/// 实例化后通过 [run] 调用；测试可注入 [ProcessRunFn] 实现。
-///
-/// External process executor: starts the process, forwards stdout / stderr
-/// according to the policy, and returns the exit code. Instantiate and call
-/// [run]; tests can inject a [ProcessRunFn] implementation.
-class ProcessRunner {
-  /// 创建执行器。[_impl] 用于注入测试实现；生产代码省略即可。
+/// External process executor base. Implementations decide output policy and
+/// whether to spawn a real process. Use [RealProcessRunner] in production and
+/// a fake in tests.
+abstract class ProcessRunner {
+  /// 创建执行器基类。
   ///
-  /// Creates a runner. [_impl] injects a test double; leave null in production.
-  ProcessRunner({this._impl});
-
-  final ProcessRunFn? _impl;
+  /// Creates a base runner.
+  const ProcessRunner();
 
   /// 在 [workingDirectory] 下执行 [executable]（参数 [args]），返回退出码。
   ///
@@ -68,18 +53,29 @@ class ProcessRunner {
     bool runInShell = false,
     IOSink? stdoutSink,
     IOSink? stderrSink,
-  }) async {
-    final impl = _impl;
-    if (impl != null) {
-      return impl(
-        executable,
-        args,
-        workingDirectory: workingDirectory,
-        showLive: showLive,
-        runInShell: runInShell,
-      );
-    }
+  });
+}
 
+/// 真实进程执行器（生产默认）。
+///
+/// 启动进程、按策略转发 stdout / stderr、返回退出码。
+///
+/// Real process runner (production default): starts the process, forwards
+/// stdout / stderr according to the policy, and returns the exit code.
+class RealProcessRunner extends ProcessRunner {
+  /// 创建执行器 / Creates a runner.
+  const RealProcessRunner();
+
+  @override
+  Future<int> run(
+    String executable,
+    List<String> args, {
+    String? workingDirectory,
+    bool showLive = false,
+    bool runInShell = false,
+    IOSink? stdoutSink,
+    IOSink? stderrSink,
+  }) async {
     final outSink = stdoutSink ?? stdout;
     final errSink = stderrSink ?? stderr;
 
@@ -153,10 +149,7 @@ class ProcessRunner {
       workingDirectory: workingDirectory,
       runInShell: runInShell,
     );
-    // 关闭子进程 stdin：fluzer 为非交互 CLI，默认不向子进程转发终端输入。
-    // 若不关闭，stdin 管道写端会一直空闲；一旦子进程读取 stdin（如交互式
-    // 确认提示），会因永远等不到数据而静默挂死。关闭后子进程读到 EOF，
-    // 会走默认值 / 干净退出。
+    // 关闭子进程 stdin：同上，避免子进程因等不到 stdin 而静默挂死。
     await process.stdin.close();
 
     // 并发排空两个流并丢弃原始字节，避免管道背压导致子进程阻塞。

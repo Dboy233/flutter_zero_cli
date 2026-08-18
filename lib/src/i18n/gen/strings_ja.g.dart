@@ -49,6 +49,8 @@ class TranslationsJa with BaseTranslations<AppLocale, Translations> implements T
 	@override late final _Translations$l10nParser$ja l10nParser = _Translations$l10nParser$ja._(_root);
 	@override late final _Translations$spinner$ja spinner = _Translations$spinner$ja._(_root);
 	@override late final _Translations$config$ja config = _Translations$config$ja._(_root);
+	@override String unsupportedTooNew({required Object version, required Object maxSupported}) => 'テンプレートバージョン ${version} は現在の fluzer の対応範囲（最大 ${maxSupported}）を超えています。fluzer を更新してください: dart pub global activate fluzer';
+	@override String unsupportedTooOld({required Object version}) => 'テンプレートバージョン ${version} は古すぎて、現在の fluzer ではサポートされていません。テンプレートまたは fluzer をアップグレードしてください。';
 }
 
 // Path: app
@@ -74,12 +76,12 @@ class _Translations$create$ja implements Translations$create$zh {
 	@override String get description => 'テンプレートから新規 Flutter プロジェクトを作成';
 	@override String get orgHelp => '組織識別子（bundle ID に影響）';
 	@override String get nameRequired => 'エラー：プロジェクト名を指定してください';
-	@override String get step1Validate => 'ステップ 1/6：プロジェクト名とディレクトリの検証 ...';
-	@override String get step2Render => 'ステップ 2/6：Mason でプロジェクトテンプレートをレンダリング ...';
-	@override String get step3FlutterCreate => 'ステップ 3/6：flutter create . を実行 ...';
-	@override String get step4CleanTest => 'ステップ 4/6：flutter create が生成した不要なテストファイルを削除 ...';
-	@override String get step5PubGet => 'ステップ 5/6：flutter pub get を実行 ...';
-	@override String get step6GenL10n => 'ステップ 6/6：flutter gen-l10n を実行 ...';
+	@override String get step1Validate => 'プロジェクト名とディレクトリの検証';
+	@override String get step2Render => 'Mason でプロジェクトテンプレートをレンダリング';
+	@override String get step3FlutterCreate => 'flutter create . を実行';
+	@override String get step4CleanTest => 'flutter create が生成した不要なテストファイルを削除';
+	@override String get step5PubGet => 'flutter pub get を実行';
+	@override String get step6GenL10n => 'flutter gen-l10n を実行';
 	@override String detailProject({required Object name, required Object org}) => '  プロジェクト名: ${name}, 組織: ${org}';
 	@override String detailGenerated({required Object path}) => '  生成済み: ${path}';
 	@override String get created => 'プロジェクトの作成が完了しました！';
@@ -108,12 +110,10 @@ class _Translations$feature$ja implements Translations$feature$zh {
 	@override String get nameRequired => 'エラー：機能名を指定してください';
 	@override String get featureNameEmpty => '機能名は空にできません。';
 	@override String get buildRunnerHelp => '生成後に build_runner を実行するか';
-	@override String get skipVersionCheckHelp => 'プロジェクトテンプレートと CLI のバージョン互換ゲートをスキップ';
-	@override String versionGateDetail({required Object version, required Object minCliVersion}) => '  プロジェクトテンプレートバージョン: ${version}, 要求 CLI >= ${minCliVersion}';
-	@override String get step1Load => 'ステップ 1/4：プロジェクト設定とバージョンゲートを読み込み ...';
-	@override String get step2Template => 'ステップ 2/4：テンプレートローダーを解決（ローカルまたはリモート）...';
-	@override String step3Generate({required Object feature}) => 'ステップ 3/4：機能モジュール ${feature} を生成 ...';
-	@override String get step4BuildRunner => 'ステップ 4/4：build_runner を実行 ...';
+	@override String get step1Load => 'プロジェクト設定を読み込み';
+	@override String get step2Template => 'テンプレートローダーを解決（ローカルまたはリモート）';
+	@override String step3Generate({required Object feature}) => '機能モジュール ${feature} を生成';
+	@override String get step4BuildRunner => 'build_runner を実行';
 	@override String detailProjectRoot({required Object path}) => '  プロジェクトルート: ${path}';
 	@override String detailPinnedVersion({required Object version}) => '  プロジェクトテンプレートバージョン ${version} にダウンロード元を固定';
 	@override String detailGenerated({required Object feature}) => '  機能モジュール ${feature} を生成しました';
@@ -134,19 +134,18 @@ class _Translations$genL10n$ja implements Translations$genL10n$zh {
 
 	// Translations
 	@override String get description => '国際化コードを生成し L10nCode クラスを自動作成';
-	@override String get step1Validate => 'ステップ 1/6：プロジェクトとバージョンゲートを検証 ...';
-	@override String get step2Parse => 'ステップ 2/6：l10n.yaml と ARB ディレクトリを解析 ...';
-	@override String get step3GenL10n => 'ステップ 3/6：flutter gen-l10n を実行 ...';
-	@override String get step4Members => 'ステップ 4/6：ローカライゼーションメンバーを解析 ...';
-	@override String get step5Generate => 'ステップ 5/6：L10nCode などのファイルを生成 ...';
-	@override String get step6Wire => 'ステップ 6/6：defaultToastHandle を接続 ...';
+	@override String get step1Validate => 'プロジェクトを検証';
+	@override String get step2Parse => 'l10n.yaml と ARB ディレクトリを解析';
+	@override String get step3GenL10n => 'flutter gen-l10n を実行';
+	@override String get step4Members => 'ローカライゼーションメンバーを解析';
+	@override String get step5Generate => 'L10nCode などのファイルを生成';
+	@override String get step6Wire => 'defaultToastHandle を接続';
 	@override String detailMembers({required Object names}) => '  メンバー: ${names}';
 	@override String generated({required Object path}) => '生成済み: ${path}';
 	@override String failed({required Object error}) => 'gen-l10n 失敗: ${error}';
 	@override String get alreadyWired => '既に接続済み、スキップ（べき等）';
 	@override String get skipHandlePatchHelp => 'defaultToastHandle の自動接続をスキップ';
 	@override String get forceHandlePatchHelp => 'l10nCode ブランチがカスタマイズされていても上書きする';
-	@override String get skipVersionCheckHelp => 'プロジェクトテンプレートと CLI のバージョン互換ゲートをスキップ';
 	@override String arbDirNotFound({required Object dir}) => '${dir} ディレクトリが見つかりません。プロジェクトで国際化が設定されているか確認してください。';
 	@override String noArbFiles({required Object dir}) => '${dir} に .arb ファイルが見つかりません。';
 	@override String foundArbFiles({required Object count}) => '${count} 個の .arb ファイルが見つかりました';
@@ -192,7 +191,6 @@ class _Translations$version$ja implements Translations$version$zh {
 	@override String get checkUnavailable => '（更新を確認できません：パッケージが未公開またはネットワークエラー）';
 	@override String newVersionFound({required Object latest}) => '新しいバージョン ${latest} が見つかりました。以下でアップグレード：';
 	@override String get alreadyLatest => '最新バージョンです';
-	@override String gateTooLow({required Object cliVersion, required Object version, required Object minCliVersion}) => '現在の CLI バージョン ${cliVersion} が低すぎます。プロジェクトテンプレート ${version} は CLI >= ${minCliVersion} を必要とします。fluzer をアップグレードするか、プロジェクト設定を確認してください。';
 	@override String updateHint({required Object latest}) => '新しいバージョン ${latest} が見つかりました。dart pub global activate fluzer でアップグレード';
 }
 
@@ -286,6 +284,7 @@ class _Translations$spinner$ja implements Translations$spinner$zh {
 	final TranslationsJa _root; // ignore: unused_field
 
 	// Translations
+	@override String stepLabel({required Object index, required Object total}) => 'ステップ ${index}/${total}';
 	@override String stepCompleted({required Object label}) => '${label} 完了';
 	@override String stepFailed({required Object label}) => '${label} 失敗';
 }
@@ -300,12 +299,9 @@ class _Translations$config$ja implements Translations$config$zh {
 	@override String notFound({required Object fileName}) => '${fileName} が見つかりません。flutter_zero テンプレートプロジェクトのルートディレクトリからコマンドを実行してください。';
 	@override String rootNotMap({required Object fileName}) => '${fileName} の形式が不正です：ルートノードは Map である必要があります。';
 	@override String missingVersion({required Object fileName}) => '${fileName} に有効な version フィールドがありません。';
-	@override String versionTooOld({required Object version, required Object minimumSupportedVersion}) => 'テンプレートバージョン ${version} が古すぎます。>= ${minimumSupportedVersion} のプロジェクトテンプレートを使用してください。';
 	@override String templateNameInvalid({required Object fileName}) => '${fileName} の template_name は "flutter_zero" である必要があります。';
 	@override String get missingPubspec => 'プロジェクトルートに pubspec.yaml がありません。';
 	@override String get missingPubspecName => 'pubspec.yaml に有効な name フィールドがありません。';
-	@override String get missingLib => 'プロジェクトルートに lib/ ディレクトリがありません。Flutter プロジェクトとして認識できません。';
-	@override String get missingInjectionBase => 'lib/core/di/injection_base.dart が見つかりません。モジュールの自動登録ができません。';
 }
 
 /// The flat map containing all translations for locale <ja>.
@@ -323,12 +319,12 @@ extension on TranslationsJa {
 			'create.description' => 'テンプレートから新規 Flutter プロジェクトを作成',
 			'create.orgHelp' => '組織識別子（bundle ID に影響）',
 			'create.nameRequired' => 'エラー：プロジェクト名を指定してください',
-			'create.step1Validate' => 'ステップ 1/6：プロジェクト名とディレクトリの検証 ...',
-			'create.step2Render' => 'ステップ 2/6：Mason でプロジェクトテンプレートをレンダリング ...',
-			'create.step3FlutterCreate' => 'ステップ 3/6：flutter create . を実行 ...',
-			'create.step4CleanTest' => 'ステップ 4/6：flutter create が生成した不要なテストファイルを削除 ...',
-			'create.step5PubGet' => 'ステップ 5/6：flutter pub get を実行 ...',
-			'create.step6GenL10n' => 'ステップ 6/6：flutter gen-l10n を実行 ...',
+			'create.step1Validate' => 'プロジェクト名とディレクトリの検証',
+			'create.step2Render' => 'Mason でプロジェクトテンプレートをレンダリング',
+			'create.step3FlutterCreate' => 'flutter create . を実行',
+			'create.step4CleanTest' => 'flutter create が生成した不要なテストファイルを削除',
+			'create.step5PubGet' => 'flutter pub get を実行',
+			'create.step6GenL10n' => 'flutter gen-l10n を実行',
 			'create.detailProject' => ({required Object name, required Object org}) => '  プロジェクト名: ${name}, 組織: ${org}',
 			'create.detailGenerated' => ({required Object path}) => '  生成済み: ${path}',
 			'create.created' => 'プロジェクトの作成が完了しました！',
@@ -348,12 +344,10 @@ extension on TranslationsJa {
 			'feature.nameRequired' => 'エラー：機能名を指定してください',
 			'feature.featureNameEmpty' => '機能名は空にできません。',
 			'feature.buildRunnerHelp' => '生成後に build_runner を実行するか',
-			'feature.skipVersionCheckHelp' => 'プロジェクトテンプレートと CLI のバージョン互換ゲートをスキップ',
-			'feature.versionGateDetail' => ({required Object version, required Object minCliVersion}) => '  プロジェクトテンプレートバージョン: ${version}, 要求 CLI >= ${minCliVersion}',
-			'feature.step1Load' => 'ステップ 1/4：プロジェクト設定とバージョンゲートを読み込み ...',
-			'feature.step2Template' => 'ステップ 2/4：テンプレートローダーを解決（ローカルまたはリモート）...',
-			'feature.step3Generate' => ({required Object feature}) => 'ステップ 3/4：機能モジュール ${feature} を生成 ...',
-			'feature.step4BuildRunner' => 'ステップ 4/4：build_runner を実行 ...',
+			'feature.step1Load' => 'プロジェクト設定を読み込み',
+			'feature.step2Template' => 'テンプレートローダーを解決（ローカルまたはリモート）',
+			'feature.step3Generate' => ({required Object feature}) => '機能モジュール ${feature} を生成',
+			'feature.step4BuildRunner' => 'build_runner を実行',
 			'feature.detailProjectRoot' => ({required Object path}) => '  プロジェクトルート: ${path}',
 			'feature.detailPinnedVersion' => ({required Object version}) => '  プロジェクトテンプレートバージョン ${version} にダウンロード元を固定',
 			'feature.detailGenerated' => ({required Object feature}) => '  機能モジュール ${feature} を生成しました',
@@ -365,19 +359,18 @@ extension on TranslationsJa {
 			'feature.featureExists' => ({required Object feature}) => '機能モジュール ${feature} は既に存在します。',
 			'feature.featureNameInvalid' => '機能名は snake_case で、かつ小文字の英字で始まる必要があります（例: user_profile）。',
 			'genL10n.description' => '国際化コードを生成し L10nCode クラスを自動作成',
-			'genL10n.step1Validate' => 'ステップ 1/6：プロジェクトとバージョンゲートを検証 ...',
-			'genL10n.step2Parse' => 'ステップ 2/6：l10n.yaml と ARB ディレクトリを解析 ...',
-			'genL10n.step3GenL10n' => 'ステップ 3/6：flutter gen-l10n を実行 ...',
-			'genL10n.step4Members' => 'ステップ 4/6：ローカライゼーションメンバーを解析 ...',
-			'genL10n.step5Generate' => 'ステップ 5/6：L10nCode などのファイルを生成 ...',
-			'genL10n.step6Wire' => 'ステップ 6/6：defaultToastHandle を接続 ...',
+			'genL10n.step1Validate' => 'プロジェクトを検証',
+			'genL10n.step2Parse' => 'l10n.yaml と ARB ディレクトリを解析',
+			'genL10n.step3GenL10n' => 'flutter gen-l10n を実行',
+			'genL10n.step4Members' => 'ローカライゼーションメンバーを解析',
+			'genL10n.step5Generate' => 'L10nCode などのファイルを生成',
+			'genL10n.step6Wire' => 'defaultToastHandle を接続',
 			'genL10n.detailMembers' => ({required Object names}) => '  メンバー: ${names}',
 			'genL10n.generated' => ({required Object path}) => '生成済み: ${path}',
 			'genL10n.failed' => ({required Object error}) => 'gen-l10n 失敗: ${error}',
 			'genL10n.alreadyWired' => '既に接続済み、スキップ（べき等）',
 			'genL10n.skipHandlePatchHelp' => 'defaultToastHandle の自動接続をスキップ',
 			'genL10n.forceHandlePatchHelp' => 'l10nCode ブランチがカスタマイズされていても上書きする',
-			'genL10n.skipVersionCheckHelp' => 'プロジェクトテンプレートと CLI のバージョン互換ゲートをスキップ',
 			'genL10n.arbDirNotFound' => ({required Object dir}) => '${dir} ディレクトリが見つかりません。プロジェクトで国際化が設定されているか確認してください。',
 			'genL10n.noArbFiles' => ({required Object dir}) => '${dir} に .arb ファイルが見つかりません。',
 			'genL10n.foundArbFiles' => ({required Object count}) => '${count} 個の .arb ファイルが見つかりました',
@@ -405,7 +398,6 @@ extension on TranslationsJa {
 			'version.checkUnavailable' => '（更新を確認できません：パッケージが未公開またはネットワークエラー）',
 			'version.newVersionFound' => ({required Object latest}) => '新しいバージョン ${latest} が見つかりました。以下でアップグレード：',
 			'version.alreadyLatest' => '最新バージョンです',
-			'version.gateTooLow' => ({required Object cliVersion, required Object version, required Object minCliVersion}) => '現在の CLI バージョン ${cliVersion} が低すぎます。プロジェクトテンプレート ${version} は CLI >= ${minCliVersion} を必要とします。fluzer をアップグレードするか、プロジェクト設定を確認してください。',
 			'version.updateHint' => ({required Object latest}) => '新しいバージョン ${latest} が見つかりました。dart pub global activate fluzer でアップグレード',
 			'template.localTemplateNotFound' => ({required Object path}) => 'ローカルテンプレートが見つかりません：\n${path}',
 			'template.remoteBrickNotFound' => ({required Object brickName}) => 'リモートテンプレートに brick が見つかりません：${brickName}',
@@ -445,17 +437,17 @@ extension on TranslationsJa {
 			'l10nParser.classBodyUnclosed' => ({required Object name}) => '${name} のクラス本体が閉じられていません。',
 			'l10nParser.classNotFound' => ({required Object name}) => 'abstract class ${name} の宣言が見つかりません。l10n.yaml の output-class 設定を確認してください。',
 			'l10nParser.paramParseFailed' => ({required Object member, required Object param}) => 'メンバー ${member} のパラメータ宣言を解析できません: "${param}"。',
+			'spinner.stepLabel' => ({required Object index, required Object total}) => 'ステップ ${index}/${total}',
 			'spinner.stepCompleted' => ({required Object label}) => '${label} 完了',
 			'spinner.stepFailed' => ({required Object label}) => '${label} 失敗',
 			'config.notFound' => ({required Object fileName}) => '${fileName} が見つかりません。flutter_zero テンプレートプロジェクトのルートディレクトリからコマンドを実行してください。',
 			'config.rootNotMap' => ({required Object fileName}) => '${fileName} の形式が不正です：ルートノードは Map である必要があります。',
 			'config.missingVersion' => ({required Object fileName}) => '${fileName} に有効な version フィールドがありません。',
-			'config.versionTooOld' => ({required Object version, required Object minimumSupportedVersion}) => 'テンプレートバージョン ${version} が古すぎます。>= ${minimumSupportedVersion} のプロジェクトテンプレートを使用してください。',
 			'config.templateNameInvalid' => ({required Object fileName}) => '${fileName} の template_name は "flutter_zero" である必要があります。',
 			'config.missingPubspec' => 'プロジェクトルートに pubspec.yaml がありません。',
 			'config.missingPubspecName' => 'pubspec.yaml に有効な name フィールドがありません。',
-			'config.missingLib' => 'プロジェクトルートに lib/ ディレクトリがありません。Flutter プロジェクトとして認識できません。',
-			'config.missingInjectionBase' => 'lib/core/di/injection_base.dart が見つかりません。モジュールの自動登録ができません。',
+			'unsupportedTooNew' => ({required Object version, required Object maxSupported}) => 'テンプレートバージョン ${version} は現在の fluzer の対応範囲（最大 ${maxSupported}）を超えています。fluzer を更新してください: dart pub global activate fluzer',
+			'unsupportedTooOld' => ({required Object version}) => 'テンプレートバージョン ${version} は古すぎて、現在の fluzer ではサポートされていません。テンプレートまたは fluzer をアップグレードしてください。',
 			_ => null,
 		};
 	}

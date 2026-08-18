@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:fluzer/src/process/process_runner.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
+import 'helpers/fake_process_runner.dart';
 
 /// 运行 [body]，将其 stdout / stderr 捕获到同一临时文件，返回文件内容。
 ///
@@ -45,7 +46,7 @@ void main() {
   late ProcessRunner runner;
 
   setUp(() {
-    runner = ProcessRunner();
+    runner = RealProcessRunner();
   });
 
   group('ProcessRunner.run 输出策略（显示 / 隐藏）', () {
@@ -153,64 +154,37 @@ void main() {
     }, timeout: const Timeout(Duration(seconds: 10)));
   });
 
-  group('ProcessRunner 依赖注入（impl）', () {
-    // 注入 impl 是本次重构的核心（消灭全局可变 runOverride）：
-    // 构造时传入 ProcessRunFn，run 必须直接调用它、不启动真实进程，
-    // 且把 executable / args / showLive / workingDirectory 原样透传。
-    test('注入 impl 时直接调用它而非启动真实进程', () async {
-      var called = false;
-      String? capturedExecutable;
-      List<String>? capturedArgs;
-      bool? capturedShowLive;
-      String? capturedWorkingDirectory;
-
-      final injected = ProcessRunner(
-        impl: (executable, args, {workingDirectory, bool showLive = false, bool runInShell = false}) async {
-          called = true;
-          capturedExecutable = executable;
-          capturedArgs = args;
-          capturedShowLive = showLive;
-          capturedWorkingDirectory = workingDirectory;
-          return 42;
-        },
-      );
-
-      final code = await injected.run(
+  group('ProcessRunner 依赖注入（FakeProcessRunner）', () {
+    // FakeProcessRunner 记录每次调用、不启动真实进程：既消灭全局可变状态，
+    // 又让测试在领域层验证「是否调用 / 传参是否正确」，无需 shell 出去。
+    test('FakeProcessRunner 记录调用且不启动真实进程', () async {
+      final fake = FakeProcessRunner(returnCode: 42);
+      final code = await fake.run(
         'dart',
         ['--version'],
         showLive: true,
         workingDirectory: '/tmp/x',
       );
-
       expect(code, 42);
-      expect(called, isTrue);
-      expect(capturedExecutable, 'dart');
-      expect(capturedArgs, ['--version']);
-      expect(capturedShowLive, isTrue);
-      expect(capturedWorkingDirectory, '/tmp/x');
+      expect(fake.calls, hasLength(1));
+      final call = fake.calls.single;
+      expect(call.executable, 'dart');
+      expect(call.args, ['--version']);
+      expect(call.showLive, isTrue);
+      expect(call.workingDirectory, '/tmp/x');
     });
 
-    test('impl 接收 showLive 的默认值（false）', () async {
-      var capturedShowLive = true;
-      final injected = ProcessRunner(
-        impl: (_, args, {workingDirectory, bool showLive = false, bool runInShell = false}) async {
-          capturedShowLive = showLive;
-          return 0;
-        },
-      );
-
-      await injected.run('dart', ['--version']);
-
-      expect(capturedShowLive, isFalse);
+    test('showLive 默认为 false', () async {
+      final fake = FakeProcessRunner();
+      await fake.run('dart', ['--version']);
+      expect(fake.calls.single.showLive, isFalse);
     });
 
-    test('impl 存在时即使 showLive:true 也不触碰真实进程', () async {
-      // 若 showLive 路径错误地把调用落回真实进程，dart --version 会成功返回 0；
-      // 这里用 impl 固定返回 7，验证全程走注入实现。
-      final injected = ProcessRunner(
-        impl: (_, args, {workingDirectory, bool showLive = false, bool runInShell = false}) async => 7,
-      );
-      final code = await injected.run(
+    test('即使 showLive:true 也绝不触碰真实进程（固定返回 returnCode）', () async {
+      // 若 FakeProcessRunner 错误地把调用落回真实进程，dart --version 会成功
+      // 返回 0；这里用 returnCode 固定返回 7，验证全程走注入实现。
+      final fake = FakeProcessRunner(returnCode: 7);
+      final code = await fake.run(
         Platform.resolvedExecutable,
         ['--version'],
         showLive: true,

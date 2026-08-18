@@ -8,13 +8,14 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:mason_logger/mason_logger.dart';
 
-import 'commands/cache_command.dart';
-import 'commands/create_command.dart';
-import 'commands/gen_l10n_command.dart';
-import 'commands/new_command.dart';
-import 'commands/version_command.dart';
+import 'commands/cache/cache_command.dart';
+import 'commands/create/create_command.dart';
+import 'commands/gen_l10n/gen_l10n_command.dart';
+import 'commands/new/new_command.dart';
+import 'commands/version/version_command.dart';
 import 'i18n/i18n.dart';
 import 'process/process_runner.dart';
+import 'version/version_check.dart';
 
 /// CLI 主类，注册并分发命令 / Main CLI class, registers and dispatches commands
 class Fluzer {
@@ -53,26 +54,29 @@ class Fluzer {
     // 不再需要额外的策略对象。
     final logger = Logger(level: debug ? Level.verbose : Level.info);
     // 解析目标区域并构建对应语言的消息实例（异步加载非基础语言的延迟库）。
-    final messages = await MessagesProvider(rawLocale: rawLocale).build();
+    //Translations
+    final translations = await MessagesProvider(rawLocale: rawLocale).build();
 
-    final pr = processRunner ?? ProcessRunner();
+    final pr = processRunner ?? RealProcessRunner();
+    final vcs = VersionCheckService(logger: logger, messages: translations);
 
-    final runner = CommandRunner<int>('fluzer', messages.app.description);
+    final runner = CommandRunner<int>('fluzer', translations.app.description);
     runner.argParser
       ..addFlag(
         'log',
         abbr: 'l',
         negatable: false,
-        help: messages.app.logFlagHelp,
+        help: translations.app.logFlagHelp,
       )
-      ..addOption('locale', abbr: 'L', help: messages.app.localeFlagHelp);
+      ..addOption('locale', abbr: 'L', help: translations.app.localeFlagHelp);
     runner
       ..addCommand(
         CreateCommand(
           logger: logger,
           workingDirectory: workingDirectory,
           processRunner: pr,
-          messages: messages,
+          translations: translations,
+          versionCheckService: vcs,
         ),
       )
       ..addCommand(
@@ -80,7 +84,8 @@ class Fluzer {
           logger: logger,
           workingDirectory: workingDirectory,
           processRunner: pr,
-          messages: messages,
+          translations: translations,
+          versionCheckService: vcs,
         ),
       )
       ..addCommand(
@@ -88,11 +93,24 @@ class Fluzer {
           logger: logger,
           workingDirectory: workingDirectory,
           processRunner: pr,
-          messages: messages,
+          translations: translations,
+          versionCheckService: vcs,
         ),
       )
-      ..addCommand(VersionCommand(logger: logger, messages: messages))
-      ..addCommand(CacheCommand(logger: logger, messages: messages));
+      ..addCommand(
+        VersionCommand(
+          logger: logger,
+          translations: translations,
+          versionCheckService: vcs,
+        ),
+      )
+      ..addCommand(
+        CacheCommand(
+          logger: logger,
+          translations: translations,
+          versionCheckService: vcs,
+        ),
+      );
 
     try {
       final result = await runner.run(arguments);
@@ -107,7 +125,7 @@ class Fluzer {
       // 或命令遗漏捕获的运行时错误），统一以退出码 1 返回并给出友好提示，
       // 避免泄漏内部堆栈并以 255 退出。--log 时附加完整堆栈。
       logger
-        ..err(messages.app.unexpectedError)
+        ..err(translations.app.unexpectedError)
         ..err('$e');
       if (debug) {
         logger.err('$st');

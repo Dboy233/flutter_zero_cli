@@ -1,7 +1,10 @@
-// VersionCheckMixin 单元测试 / Unit tests for VersionCheckMixin.
+// 启动版本提示单元测试 / Unit tests for ensureUpdateNotified.
 //
 // 通过 spy service 验证分支逻辑：缓存命中走 peek 快路径（不触网），
 // 缓存未命中才调用注入的检查服务；两条路径均不抛异常、不阻断调用方。
+//
+// 原 [VersionCheckMixin.ensureUpdateNotified] 已抽离为独立顶层函数，本文件
+// 随之改为测试该函数。
 //
 // Uses a spy service to verify branching: a cache hit takes the peek fast
 // path (no network call), while a cache miss invokes the injected service.
@@ -9,40 +12,12 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:args/command_runner.dart';
 import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:fluzer/src/version/version_check.dart';
-import 'package:fluzer/src/version/version_check_mixin.dart';
+import 'package:fluzer/src/version/version_update_notifier.dart';
 import 'package:mason_logger/mason_logger.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
-
-/// 仅用于测试 mixin 行为的假命令。
-///
-/// Fake command used solely to exercise the mixin.
-class _FakeCmd extends Command<int> with VersionCheckMixin {
-  _FakeCmd(this._logger, this._versionCheckService);
-
-  final Logger _logger;
-  @override
-  Logger get logger => _logger;
-
-  final VersionCheckService _versionCheckService;
-  @override
-  VersionCheckService get versionCheckService => _versionCheckService;
-
-  @override
-  Translations get messages => AppLocale.zh.buildSync();
-
-  @override
-  String get name => 'fake';
-
-  @override
-  String get description => 'fake';
-
-  @override
-  Future<int> run() async => 0;
-}
 
 /// spy 版版本检查服务，可注入回调追踪调用，同时保留真实缓存读写。
 ///
@@ -61,7 +36,7 @@ class _SpyVersionCheckService extends VersionCheckService {
 }
 
 void main() {
-  group('VersionCheckMixin.ensureUpdateNotified', () {
+  group('ensureUpdateNotified', () {
     late Directory cacheDir;
     late File cacheFile;
 
@@ -77,41 +52,45 @@ void main() {
 
     test('缓存未命中 + 有更新 → 调用检查服务且不抛异常', () async {
       var called = false;
-      final cmd = _FakeCmd(
-        Logger(level: Level.quiet),
-        _SpyVersionCheckService(
-          () async {
-            called = true;
-            return VersionCheckResult(
-              current: '1.0.0',
-              latest: '9.9.9',
-              hasUpdate: true,
-              packageName: 'fluzer',
-            );
-          },
-          logger: Logger(level: Level.quiet),
-        ),
+      final logger = Logger(level: Level.quiet);
+      final service = _SpyVersionCheckService(
+        () async {
+          called = true;
+          return VersionCheckResult(
+            current: '1.0.0',
+            latest: '9.9.9',
+            hasUpdate: true,
+            packageName: 'fluzer',
+          );
+        },
+        logger: logger,
       );
-      await cmd.ensureUpdateNotified();
+      await ensureUpdateNotified(
+        logger: logger,
+        translations: AppLocale.zh.buildSync(),
+        versionCheckService: service,
+      );
       expect(called, isTrue);
     });
 
     test('缓存未命中 + 不可用 → 调用检查服务且不抛异常', () async {
       var called = false;
-      final cmd = _FakeCmd(
-        Logger(level: Level.quiet),
-        _SpyVersionCheckService(
-          () async {
-            called = true;
-            return VersionCheckResult.unavailable(
-              current: '1.0.0',
-              packageName: 'fluzer',
-            );
-          },
-          logger: Logger(level: Level.quiet),
-        ),
+      final logger = Logger(level: Level.quiet);
+      final service = _SpyVersionCheckService(
+        () async {
+          called = true;
+          return VersionCheckResult.unavailable(
+            current: '1.0.0',
+            packageName: 'fluzer',
+          );
+        },
+        logger: logger,
       );
-      await cmd.ensureUpdateNotified();
+      await ensureUpdateNotified(
+        logger: logger,
+        translations: AppLocale.zh.buildSync(),
+        versionCheckService: service,
+      );
       expect(called, isTrue);
     });
 
@@ -125,17 +104,19 @@ void main() {
         },
       }));
       var called = false;
-      final cmd = _FakeCmd(
-        Logger(level: Level.quiet),
-        _SpyVersionCheckService(
-          () async {
-            called = true;
-            throw StateError('不应被调用 / should not be called');
-          },
-          logger: Logger(level: Level.quiet),
-        ),
+      final logger = Logger(level: Level.quiet);
+      final service = _SpyVersionCheckService(
+        () async {
+          called = true;
+          throw StateError('不应被调用 / should not be called');
+        },
+        logger: logger,
       );
-      await cmd.ensureUpdateNotified();
+      await ensureUpdateNotified(
+        logger: logger,
+        translations: AppLocale.zh.buildSync(),
+        versionCheckService: service,
+      );
       expect(called, isFalse);
     });
 
@@ -149,17 +130,19 @@ void main() {
         },
       }));
       var called = false;
-      final cmd = _FakeCmd(
-        Logger(level: Level.quiet),
-        _SpyVersionCheckService(
-          () async {
-            called = true;
-            throw StateError('不应被调用 / should not be called');
-          },
-          logger: Logger(level: Level.quiet),
-        ),
+      final logger = Logger(level: Level.quiet);
+      final service = _SpyVersionCheckService(
+        () async {
+          called = true;
+          throw StateError('不应被调用 / should not be called');
+        },
+        logger: logger,
       );
-      await cmd.ensureUpdateNotified();
+      await ensureUpdateNotified(
+        logger: logger,
+        translations: AppLocale.zh.buildSync(),
+        versionCheckService: service,
+      );
       expect(called, isFalse);
     });
   });

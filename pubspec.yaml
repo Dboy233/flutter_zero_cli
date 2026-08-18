@@ -1,6 +1,6 @@
 name: fluzer
 description: CLI tool for scaffolding Flutter Zero template projects.
-version: 1.2.1
+version: 2.0.0
 repository: https://github.com/Dboy233/flutter_zero_cli
 homepage: https://github.com/Dboy233/flutter_zero_cli
 issue_tracker: https://github.com/Dboy233/flutter_zero_cli/issues

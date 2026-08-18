@@ -4,20 +4,28 @@ import 'package:fluzer/src/i18n/gen/strings.g.dart';
 import 'package:path/path.dart' as path;
 import 'package:yaml/yaml.dart';
 
-import '../util/semantic_version.dart';
-import 'template_config.dart';
-
-/// 项目配置加载与校验。
+/// 项目配置加载。
 ///
-/// 从当前目录向上查找 `flutter_zero_config.yaml`，
-/// 验证其为有效的 flutter_zero 模板项目。
+/// 从当前目录向上查找配置文件
+/// （[fileNames]：v1 `flutter_zero_config.yaml` 或 v2 `fluzer.yaml`），
+/// 读取其中的 `version` / `template_name` / `package` 等字段。
+/// 两种命名均可识别，向下兼容老项目。
+///
+/// CLI 不再依据模板版本做兼容性门禁（力求适配所有模板版本），
+/// 故 [load] 只做「字段存在性」校验，不再拒绝特定版本，也不再校验
+/// `lib/` 目录与 DI 注入点等内部结构。
 ///
 ///
-/// Project configuration loader and validator.
+/// Project configuration loader.
 ///
-/// Walks up from the current directory looking for
-/// `flutter_zero_config.yaml`, validating that the directory
-/// belongs to a flutter_zero template project.
+/// Walks up from the current directory looking for any of [fileNames]
+/// (v1 `flutter_zero_config.yaml` or v2 `fluzer.yaml`), reading its
+/// `version` / `template_name` / `package` fields. Both names are
+/// recognized for backward compatibility with legacy projects.
+///
+/// The CLI no longer gates on the template version (it aims to support all
+/// template versions), so [load] only validates field presence—it neither
+/// rejects specific versions nor checks internal structure like `lib/`.
 class ProjectConfig {
   /// 创建项目配置。
   ///
@@ -27,7 +35,6 @@ class ProjectConfig {
     required this.projectRoot,
     required this.templateName,
     required this.packageName,
-    required this.minCliVersion,
   });
 
   /// 模板版本号。
@@ -50,32 +57,19 @@ class ProjectConfig {
   /// Flutter package name, used for package imports.
   final String packageName;
 
-  /// 该模板版本要求的最低 CLI 版本。
+  /// 配置文件名（按查找优先级排序）。
   ///
-  /// Minimum CLI version required by this template version.
+  /// 均为合法配置名：v1 老项目使用 [_fileNameV1]，v2 起改用 [_fileNameV2]。
+  /// [findConfigFile] / [findProjectRoot] / [load] 均兼容二者。
   ///
-  /// 缺失时（老项目未写入该字段）默认 `"0.0.0"`，表示兼容任意 CLI 版本。
-  /// Defaults to `"0.0.0"` when missing (legacy projects), meaning any CLI
-  /// version is accepted.
-  final String minCliVersion;
-
-  /// 判断当前运行的 CLI 版本是否满足该项目模板的最低要求。
+  /// Configuration file names (in lookup priority order).
   ///
-  /// 用于 `new` / `gen-l10n` 命令的版本门禁：
-  /// 当 [currentCliVersion] >= [minCliVersion] 时返回 `true`。
-  ///
-  /// Checks whether the running CLI version satisfies this template's
-  /// minimum requirement. Returns `true` when
-  /// [currentCliVersion] >= [minCliVersion].
-  bool isCliCompatible(String currentCliVersion) {
-    return SemanticVersion.parse(minCliVersion) <=
-        SemanticVersion.parse(currentCliVersion);
-  }
-
-  /// 配置文件名。
-  ///
-  /// Configuration file name.
-  static const String fileName = 'flutter_zero_config.yaml';
+  /// Both are valid config names: legacy projects use [_fileNameV1],
+  /// v2+ uses [_fileNameV2]. [findConfigFile] / [findProjectRoot] / [load]
+  /// recognize both.
+  static const String _fileNameV1 = 'flutter_zero_config.yaml';
+  static const String _fileNameV2 = 'fluzer.yaml';
+  static const List<String> fileNames = [_fileNameV1, _fileNameV2];
 
   /// 查找并加载项目配置。
   ///
@@ -83,49 +77,37 @@ class ProjectConfig {
   /// [messages] 为本地化消息（默认中文），用于异常提示国际化。
   /// 返回配置；失败时抛出 [CliException]。
   ///
+  /// 兼容 [fileNames] 中的任一文件名（v1/v2），读取命中文件的真实内容。
   ///
   /// Locates and loads the project configuration.
   ///
   /// [start] is the directory to walk up from (defaults to cwd).
   /// [messages] are the localized messages (defaults to Chinese) used for
   /// exception messages. Returns the config or throws [CliException].
+  ///
+  /// Recognizes any of [fileNames] (v1/v2) and reads the hit file's content.
   static Future<ProjectConfig> load({
     Directory? start,
     Translations? messages,
   }) async {
     final m = messages ?? AppLocale.zh.buildSync();
-    final root = await _findProjectRoot(start ?? Directory.current);
-    if (root == null) {
-      throw CliException(m.config.notFound(fileName: fileName));
+    final configFile = await findConfigFile(start ?? Directory.current);
+    if (configFile == null) {
+      throw CliException(m.config.notFound(fileName: fileNames.join('or')));
     }
+    final root = configFile.parent;
 
-    final configFile = File(path.join(root.path, fileName));
     final raw = await configFile.readAsString();
     final yaml = loadYaml(raw);
 
     if (yaml is! Map) {
-      throw CliException(m.config.rootNotMap(fileName: fileName));
+      throw CliException(m.config.rootNotMap(fileName: fileNames.join('or')));
     }
 
+    final fileName = path.basename(configFile.path);
     final version = yaml['version'];
     if (version is! String || version.isEmpty) {
       throw CliException(m.config.missingVersion(fileName: fileName));
-    }
-
-    // minCliVersion 为可选字段：老项目可能未写入，默认 "0.0.0"（兼容任意 CLI）。
-    final rawMinCli = yaml['minCliVersion'];
-    final minCliVersion = rawMinCli is String && rawMinCli.isNotEmpty
-        ? rawMinCli
-        : '0.0.0';
-
-    if (SemanticVersion.parse(version) <
-        SemanticVersion.parse(minimumSupportedVersion)) {
-      throw CliException(
-        m.config.versionTooOld(
-          version: version,
-          minimumSupportedVersion: minimumSupportedVersion,
-        ),
-      );
     }
 
     final templateName = yaml['template_name'];
@@ -133,7 +115,9 @@ class ProjectConfig {
       throw CliException(m.config.templateNameInvalid(fileName: fileName));
     }
 
-    // 额外校验项目结构是否存在
+    // 读取 pubspec 的 package 名（gen-l10n 生成导入需要）。
+    // 不校验 lib/ 目录与 DI 注入点等内部结构——CLI 适配所有模板版本，
+    // 结构差异由各命令的版本适配器自行处理。
     final pubspecFile = File(path.join(root.path, 'pubspec.yaml'));
     if (!await pubspecFile.exists()) {
       throw CliException(m.config.missingPubspec);
@@ -144,40 +128,44 @@ class ProjectConfig {
       throw CliException(m.config.missingPubspecName);
     }
 
-    final libDir = Directory(path.join(root.path, 'lib'));
-    if (!await libDir.exists()) {
-      throw CliException(m.config.missingLib);
-    }
-
-    final injectionBase = File(
-      path.join(root.path, 'lib', 'core', 'di', 'injection_base.dart'),
-    );
-    if (!await injectionBase.exists()) {
-      throw CliException(m.config.missingInjectionBase);
-    }
-
     return ProjectConfig(
       version: version,
       projectRoot: root.path,
       templateName: templateName,
       packageName: packageName,
-      minCliVersion: minCliVersion,
     );
   }
 
-  /// 从 [start] 向上查找包含 `flutter_zero_config.yaml` 的目录。
+  /// 从 [start] 向上查找命中任一配置文件 [fileNames] 的 [File]。
   ///
-  /// Walks up from [start] looking for `flutter_zero_config.yaml`.
-  static Future<Directory?> _findProjectRoot(Directory start) async {
+  /// 返回首个命中的配置文件；都未命中返回 `null`。
+  /// 它是 [findProjectRoot] 与 [TemplateVersionReader] 的**单一文件定位事实源**，
+  /// 避免重复查找逻辑（向上遍历策略只此一处维护）。
+  ///
+  /// Walks up from [start] looking for the first of [fileNames];
+  /// returns the hit [File], or `null` if none found.
+  /// This is the single source of truth for file location, shared by
+  /// [findProjectRoot] and [TemplateVersionReader].
+  static Future<File?> findConfigFile(Directory start) async {
     var current = start.absolute;
     while (true) {
-      final file = File(path.join(current.path, fileName));
-      if (await file.exists()) return current;
+      for (final name in fileNames) {
+        final file = File(path.join(current.path, name));
+        if (await file.exists()) return file;
+      }
 
       final parent = current.parent;
       if (parent.path == current.path) return null;
       current = parent;
     }
+  }
+
+  /// 从 [start] 向上查找包含任一配置文件 [fileNames] 的目录。
+  ///
+  /// Walks up from [start] looking for any of [fileNames].
+  static Future<Directory?> findProjectRoot(Directory start) async {
+    final configFile = await findConfigFile(start);
+    return configFile?.parent;
   }
 }
 

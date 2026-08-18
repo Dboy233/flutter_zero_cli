@@ -14,11 +14,13 @@ import 'package:mason_logger/mason_logger.dart';
 import 'package:fluzer/src/codemod/code_mod.dart';
 import 'package:fluzer/src/codemod/insert_at_method_end_transform.dart';
 import 'package:fluzer/src/codemod/ordered_import_transform.dart';
-import 'package:fluzer/src/commands/cache_command.dart';
-import 'package:fluzer/src/commands/create_command.dart';
-import 'package:fluzer/src/commands/new_command.dart';
-import 'package:fluzer/src/commands/version_command.dart';
+import 'package:fluzer/src/commands/cache/cache_command.dart';
+import 'package:fluzer/src/commands/create/create_command.dart';
+import 'package:fluzer/src/commands/new/new_command.dart';
+import 'package:fluzer/src/commands/version/version_command.dart';
 import 'package:fluzer/src/config/project_config.dart';
+import 'package:fluzer/src/i18n/gen/strings.g.dart';
+import 'package:fluzer/src/process/process_runner.dart';
 import 'package:fluzer/src/template/brick_loader.dart';
 import 'package:fluzer/src/template/brick_renderer.dart';
 import 'package:fluzer/src/template/feature_generator.dart';
@@ -27,6 +29,15 @@ import 'package:path/path.dart' as path;
 import 'package:test/test.dart';
 
 import 'test_utils.dart';
+import 'helpers/fake_process_runner.dart';
+
+/// 测试中命令构造共享的必填依赖（避免每个构造点重复拼装）。
+///
+/// Shared required deps for command construction in tests (avoid repeating the
+/// wiring at every construction site).
+final _testLogger = Logger(level: Level.quiet);
+final _testTranslations = AppLocale.zh.buildSync();
+final _testProcessRunner = RealProcessRunner();
 
 /// 测试中注入「无更新」的版本检查服务，避免触达 pub.dev 网络。
 ///
@@ -311,7 +322,6 @@ void main() {
         projectRoot: projectDir.path,
         templateName: 'flutter_zero',
         packageName: 'test_app',
-        minCliVersion: '1.0.0',
       );
       final generator = FeatureGenerator(
         config: config,
@@ -355,7 +365,6 @@ void main() {
         projectRoot: projectDir.path,
         templateName: 'flutter_zero',
         packageName: 'test_app',
-        minCliVersion: '1.0.0',
       );
       final generator = FeatureGenerator(
         config: config,
@@ -390,6 +399,9 @@ void main() {
       test('缺少项目名 → 返回 1 / missing project name returns 1', () async {
         final code = await runnerWith(
           CreateCommand(
+            logger: _testLogger,
+            translations: _testTranslations,
+            processRunner: _testProcessRunner,
             workingDirectory: sandbox,
             versionCheckService: _noopVersionCheckService,
           ),
@@ -401,6 +413,9 @@ void main() {
         final code =
             await runnerWith(
               CreateCommand(
+                logger: _testLogger,
+                translations: _testTranslations,
+                processRunner: _testProcessRunner,
                 workingDirectory: sandbox,
                 versionCheckService: _noopVersionCheckService,
               ),
@@ -422,6 +437,9 @@ void main() {
 
           final code = await runnerWith(
             CreateCommand(
+              logger: _testLogger,
+              translations: _testTranslations,
+              processRunner: _testProcessRunner,
               workingDirectory: sandbox,
               versionCheckService: _noopVersionCheckService,
             ),
@@ -439,13 +457,14 @@ void main() {
         '完整流程（注入运行时）→ 返回 0 并生成项目 / full flow returns 0',
         () async {
           final bricksRoot = await _buildProjectBrick(sandbox);
+          final fake = FakeProcessRunner();
           final cmd = CreateCommand(
+            logger: _testLogger,
+            translations: _testTranslations,
+            processRunner: fake,
             versionCheckService: _noopVersionCheckService,
             loader: LocalBrickLoader(bricksRoot),
             workingDirectory: sandbox,
-            flutterCreate: (_, {String? projectName, String? org}) async => 0,
-            flutterPubGet: (_) async => 0,
-            flutterGenL10n: (_) async => 0,
           );
           final code = await runnerWith(cmd)
               .run(['create', 'my_app']);
@@ -454,6 +473,28 @@ void main() {
             path.join(sandbox.path, 'my_app', 'pubspec.yaml'),
           );
           expect(pubspec.existsSync(), isTrue);
+          // 重构后三个 flutter 子命令统一经 processRunner 执行
+          expect(
+            fake.calls.any(
+              (c) => c.executable == 'flutter' && c.args.contains('create'),
+            ),
+            isTrue,
+          );
+          expect(
+            fake.calls.any(
+              (c) =>
+                  c.executable == 'flutter' &&
+                  c.args.contains('pub') &&
+                  c.args.contains('get'),
+            ),
+            isTrue,
+          );
+          expect(
+            fake.calls.any(
+              (c) => c.executable == 'flutter' && c.args.contains('gen-l10n'),
+            ),
+            isTrue,
+          );
         },
       );
 
@@ -462,13 +503,14 @@ void main() {
         'flutter create failure returns 1 and cleans up',
         () async {
           final bricksRoot = await _buildProjectBrick(sandbox);
+          final fake = FakeProcessRunner(returnCode: 1);
           final cmd = CreateCommand(
+            logger: _testLogger,
+            translations: _testTranslations,
+            processRunner: fake,
             versionCheckService: _noopVersionCheckService,
             loader: LocalBrickLoader(bricksRoot),
             workingDirectory: sandbox,
-            flutterCreate: (_, {String? projectName, String? org}) async => 1,
-            flutterPubGet: (_) async => 0,
-            flutterGenL10n: (_) async => 0,
           );
           final code = await runnerWith(cmd)
               .run(['create', 'fail_app']);
@@ -477,6 +519,15 @@ void main() {
           expect(
             Directory(path.join(sandbox.path, 'fail_app')).existsSync(),
             isFalse,
+          );
+          // 仅 flutter create 被调用（返回 1，后续步骤未达）
+          expect(
+            fake.calls
+                .where(
+                  (c) => c.executable == 'flutter' && c.args.contains('create'),
+                )
+                .length,
+            1,
           );
         },
       );
@@ -503,6 +554,9 @@ void main() {
       test('缺少功能名 → 返回 1 / missing feature name returns 1', () async {
         final code = await runnerWith(
           NewCommand(
+            logger: _testLogger,
+            translations: _testTranslations,
+            processRunner: _testProcessRunner,
             workingDirectory: projectDir,
             versionCheckService: _noopVersionCheckService,
           ),
@@ -515,10 +569,12 @@ void main() {
         'full flow returns 0 and registers DI',
         () async {
           final cmd = NewCommand(
+            logger: _testLogger,
+            translations: _testTranslations,
             versionCheckService: _noopVersionCheckService,
             loader: LocalBrickLoader(bricksRoot),
             workingDirectory: projectDir,
-            buildRunner: (_, {String? buildFilter}) async => 0,
+            processRunner: FakeProcessRunner(),
           );
           final code = await runnerWith(cmd).run(['new', 'user_profile']);
           expect(code, 0);
@@ -552,21 +608,25 @@ void main() {
         '完整流程 build_runner 收到正确的 --build-filter / '
         'build_runner receives correct --build-filter',
         () async {
-          String? receivedFilter;
+          final fake = FakeProcessRunner();
           final cmd = NewCommand(
+            logger: _testLogger,
+            translations: _testTranslations,
             versionCheckService: _noopVersionCheckService,
             loader: LocalBrickLoader(bricksRoot),
             workingDirectory: projectDir,
-            buildRunner: (_, {String? buildFilter}) async {
-              receivedFilter = buildFilter;
-              return 0;
-            },
+            processRunner: fake,
           );
           await runnerWith(cmd).run(['new', 'user_profile']);
 
           expect(
-            receivedFilter,
-            'lib/features/user_profile/**.dart',
+            fake.calls.any(
+              (c) =>
+                  c.executable == 'dart' &&
+                  c.args.contains('--build-filter') &&
+                  c.args.contains('lib/features/user_profile/**.dart'),
+            ),
+            isTrue,
           );
         },
       );
@@ -586,6 +646,8 @@ void main() {
         );
         final code = await runnerWith(
           VersionCommand(
+            logger: Logger(level: Level.quiet),
+            translations: _testTranslations,
             versionCheckService: _SpyVersionCheckService(
               () async {
               called = true;
@@ -607,7 +669,12 @@ void main() {
           packageName: 'fluzer',
         );
         final code = await runnerWith(
-          VersionCommand(versionCheckService: _SpyVersionCheckService(() async => result, logger: Logger(level: Level.quiet))),
+          VersionCommand(
+            logger: Logger(level: Level.quiet),
+            translations: _testTranslations,
+            versionCheckService:
+                _SpyVersionCheckService(() async => result, logger: Logger(level: Level.quiet)),
+          ),
         ).run(['version']);
         expect(code, 0);
       });
@@ -618,7 +685,12 @@ void main() {
           packageName: 'fluzer',
         );
         final code = await runnerWith(
-          VersionCommand(versionCheckService: _SpyVersionCheckService(() async => result, logger: Logger(level: Level.quiet))),
+          VersionCommand(
+            logger: Logger(level: Level.quiet),
+            translations: _testTranslations,
+            versionCheckService:
+                _SpyVersionCheckService(() async => result, logger: Logger(level: Level.quiet)),
+          ),
         ).run(['version']);
         expect(code, 0);
       });
@@ -639,7 +711,7 @@ void main() {
       });
 
       test('cache list 空目录 → 返回 0 / empty cache list returns 0', () async {
-        final code = await runnerWith(CacheCommand(cacheDir: cacheDir))
+        final code = await runnerWith(CacheCommand(logger: _testLogger, translations: _testTranslations, versionCheckService: _noopVersionCheckService, cacheDir: cacheDir))
             .run(['cache', 'list']);
         expect(code, 0);
       });
@@ -651,7 +723,7 @@ void main() {
         // 版本检查缓存文件不应被当作模板版本
         File(path.join(cacheDir.path, 'version_check.json'))
             .writeAsStringSync('{}');
-        final code = await runnerWith(CacheCommand(cacheDir: cacheDir))
+        final code = await runnerWith(CacheCommand(logger: _testLogger, translations: _testTranslations, versionCheckService: _noopVersionCheckService, cacheDir: cacheDir))
             .run(['cache', 'list']);
         expect(code, 0);
       });
@@ -660,7 +732,7 @@ void main() {
         Directory(path.join(cacheDir.path, 'template_1.0.0')).createSync();
         File(path.join(cacheDir.path, 'version_check.json'))
             .writeAsStringSync('{}');
-        final code = await runnerWith(CacheCommand(cacheDir: cacheDir))
+        final code = await runnerWith(CacheCommand(logger: _testLogger, translations: _testTranslations, versionCheckService: _noopVersionCheckService, cacheDir: cacheDir))
             .run(['cache', 'clean']);
         expect(code, 0);
         // 版本目录已删除
@@ -677,7 +749,7 @@ void main() {
 
       test('cache clean 空目录 → 返回 0 / clean empty cache returns 0',
           () async {
-        final code = await runnerWith(CacheCommand(cacheDir: cacheDir))
+        final code = await runnerWith(CacheCommand(logger: _testLogger, translations: _testTranslations, versionCheckService: _noopVersionCheckService, cacheDir: cacheDir))
             .run(['cache', 'clean']);
         expect(code, 0);
       });

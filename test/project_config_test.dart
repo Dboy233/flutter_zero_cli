@@ -7,33 +7,7 @@ import 'package:test/test.dart';
 import 'test_utils.dart';
 
 void main() {
-  group('ProjectConfig.isCliCompatible', () {
-    ProjectConfig cfg(String minCliVersion) => ProjectConfig(
-          version: '1.0.1',
-          projectRoot: '.',
-          templateName: 'flutter_zero',
-          packageName: 'app',
-          minCliVersion: minCliVersion,
-        );
-
-    test('minCliVersion <= cliVersion → true', () {
-      expect(cfg('1.0.0').isCliCompatible('1.1.0'), isTrue);
-    });
-
-    test('minCliVersion > cliVersion → false（需升级 CLI）', () {
-      expect(cfg('1.1.0').isCliCompatible('1.0.0'), isFalse);
-    });
-
-    test('相等边界 → true', () {
-      expect(cfg('1.1.0').isCliCompatible('1.1.0'), isTrue);
-    });
-
-    test('minCliVersion 0.0.0 → 任意 CLI 兼容（老项目兜底）', () {
-      expect(cfg('0.0.0').isCliCompatible('0.0.1'), isTrue);
-    });
-  });
-
-  group('ProjectConfig.load 解析 minCliVersion', () {
+  group('ProjectConfig.load', () {
     late Directory dir;
 
     setUp(() async {
@@ -42,46 +16,118 @@ void main() {
 
     tearDown(() async => deleteTempDir(dir));
 
-    Future<Directory> scaffold({String? minCliVersion}) async {
+    Future<Directory> scaffold({
+      String version = '1.0.1',
+      String configName = 'flutter_zero_config.yaml',
+    }) async {
       final buf = StringBuffer()
-        ..writeln('version: "1.0.1"')
+        ..writeln('version: "$version"')
         ..writeln('template_name: flutter_zero');
-      if (minCliVersion != null) {
-        buf.writeln('minCliVersion: "$minCliVersion"');
-      }
-      await File(p.join(dir.path, 'flutter_zero_config.yaml'))
-          .writeAsString(buf.toString());
+      await File(p.join(dir.path, configName)).writeAsString(buf.toString());
       await File(p.join(dir.path, 'pubspec.yaml'))
           .writeAsString('name: sample_app\n');
-      await Directory(p.join(dir.path, 'lib')).create(recursive: true);
-      await Directory(p.join(dir.path, 'lib', 'core', 'di'))
-          .create(recursive: true);
-      await File(p.join(dir.path, 'lib', 'core', 'di', 'injection_base.dart'))
-          .writeAsString('// placeholder\n');
       return dir;
     }
 
-    test('显式 minCliVersion 被正确解析', () async {
-      final d = await scaffold(minCliVersion: '1.1.0');
-      final config = await ProjectConfig.load(start: d);
-      expect(config.minCliVersion, '1.1.0');
-    });
-
-    test('缺失 minCliVersion 默认 0.0.0（老项目兼容）', () async {
+    test('读取 version / templateName / packageName', () async {
       final d = await scaffold();
       final config = await ProjectConfig.load(start: d);
-      expect(config.minCliVersion, '0.0.0');
+      expect(config.version, '1.0.1');
+      expect(config.templateName, 'flutter_zero');
+      expect(config.packageName, 'sample_app');
+      expect(config.projectRoot, d.path);
     });
 
-    test('minCliVersion 非字符串 → 默认 0.0.0（宽松兼容，不报错）', () async {
-      final d = await scaffold();
-      await File(p.join(d.path, 'flutter_zero_config.yaml')).writeAsString(
-        'version: "1.0.1"\n'
-        'template_name: flutter_zero\n'
-        'minCliVersion: 100\n', // 整数，yaml 解析为 int 而非 string
+    test('v2 文件名 fluzer.yaml 仅存在时 load 成功（双名兼容）', () async {
+      final d = await scaffold(configName: 'fluzer.yaml');
+      final config = await ProjectConfig.load(start: d);
+      expect(config.version, '1.0.1');
+      expect(config.projectRoot, d.path);
+    });
+
+    test('v1/v2 同时存在时优先 v1（fileNames 顺序）', () async {
+      // 同时写两个文件，内容不同以便区分命中的是哪个。
+      final bufV1 = StringBuffer()
+        ..writeln('version: "1.0.1"')
+        ..writeln('template_name: flutter_zero');
+      await File(p.join(dir.path, 'flutter_zero_config.yaml'))
+          .writeAsString(bufV1.toString());
+      final bufV2 = StringBuffer()
+        ..writeln('version: "2.0.0"')
+        ..writeln('template_name: flutter_zero');
+      await File(p.join(dir.path, 'fluzer.yaml'))
+          .writeAsString(bufV2.toString());
+      await File(p.join(dir.path, 'pubspec.yaml'))
+          .writeAsString('name: sample_app\n');
+
+      final config = await ProjectConfig.load(start: dir);
+      expect(config.version, '1.0.1'); // 命中 v1
+    });
+
+    test('缺失 version 字段 → 抛 CliException', () async {
+      await File(p.join(dir.path, 'flutter_zero_config.yaml')).writeAsString(
+        'template_name: flutter_zero\n',
       );
-      final config = await ProjectConfig.load(start: d);
-      expect(config.minCliVersion, '0.0.0');
+      await File(p.join(dir.path, 'pubspec.yaml')).writeAsString('name: x\n');
+      expect(
+        () => ProjectConfig.load(start: dir),
+        throwsA(isA<CliException>()),
+      );
+    });
+
+    test('template_name 非 flutter_zero → 抛 CliException', () async {
+      await File(p.join(dir.path, 'flutter_zero_config.yaml')).writeAsString(
+        'version: "1.0.1"\n'
+        'template_name: other\n',
+      );
+      await File(p.join(dir.path, 'pubspec.yaml')).writeAsString('name: x\n');
+      expect(
+        () => ProjectConfig.load(start: dir),
+        throwsA(isA<CliException>()),
+      );
+    });
+
+    test('缺失 pubspec.yaml → 抛 CliException（仍需读取 package 名）', () async {
+      await File(p.join(dir.path, 'flutter_zero_config.yaml')).writeAsString(
+        'version: "1.0.1"\ntemplate_name: flutter_zero\n',
+      );
+      expect(
+        () => ProjectConfig.load(start: dir),
+        throwsA(isA<CliException>()),
+      );
+    });
+  });
+
+  group('ProjectConfig.findConfigFile v1/v2 兼容', () {
+    late Directory dir;
+
+    setUp(() async {
+      dir = await Directory.systemTemp.createTemp('fluzer_fcf_');
+    });
+
+    tearDown(() async => deleteTempDir(dir));
+
+    test('仅 fluzer.yaml 时定位到 v2 文件', () async {
+      await File(p.join(dir.path, 'fluzer.yaml'))
+          .writeAsString('version: "1.0.1"\ntemplate_name: flutter_zero\n');
+      final file = await ProjectConfig.findConfigFile(dir);
+      expect(file, isNotNull);
+      expect(p.basename(file!.path), 'fluzer.yaml');
+    });
+
+    test('二者都不存在时返回 null', () async {
+      final file = await ProjectConfig.findConfigFile(dir);
+      expect(file, isNull);
+    });
+
+    test('从子目录向上可命中父目录的配置文件', () async {
+      final child = Directory(p.join(dir.path, 'a', 'b'))
+        ..createSync(recursive: true);
+      await File(p.join(dir.path, 'flutter_zero_config.yaml'))
+          .writeAsString('version: "1.0.1"\ntemplate_name: flutter_zero\n');
+      final file = await ProjectConfig.findConfigFile(child);
+      expect(file, isNotNull);
+      expect(p.basename(file!.path), 'flutter_zero_config.yaml');
     });
   });
 }

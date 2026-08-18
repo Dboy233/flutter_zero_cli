@@ -11,7 +11,7 @@
 /// CLI 自身版本号。发布新版本时须与 `pubspec.yaml` 的 `version` 同步。
 ///
 /// This CLI's own version. Keep in sync with `pubspec.yaml` when releasing.
-const String cliVersion = '1.2.1';
+const String cliVersion = '2.0.0';
 
 /// 远程 registry 地址（发布前替换为真实 raw URL）。
 ///
@@ -21,16 +21,18 @@ const String cliVersion = '1.2.1';
 const String templateRegistryUrl =
     'https://raw.githubusercontent.com/Dboy233/flutter_zero_template/main/template_registry.json';
 
-/// 模板项目必须包含的最小版本号（CLI 能接受的最老模板版本）。
+/// 兜底模板 zip 的版本段（**仅用于拼接下载 URL**，不是兼容性门槛）。
 ///
-/// 与 [defaultTemplateZipUrl] 共用此值：兜底 zip 即该最低版本模板本身。
-/// 发布 CLI 时**不要**把它同步成 CLI 版本，否则会错误排斥 1.0.x 等正常模板。
+/// 注意：CLI 已不再依据模板版本做兼容性门禁（力求适配所有模板版本），
+/// 此常量只作为 `create` 命令 registry 拉取失败时的兜底下载地址版本段，
+/// 与 CLI 能否运行某模板无关。发布 CLI 时**不要**把它同步成 CLI 版本。
 const String minimumSupportedVersion = '1.0.0';
 
 /// 内置兜底模板 zip 地址（registry 拉取失败时使用）。
 ///
 /// 版本段由 [minimumSupportedVersion] 自动拼接，二者保持同步；
 /// 发布前请确认 URL 基址指向真实 Release 资源。
+/// 该地址仅作下载兜底，**不参与任何版本兼容性判断**。
 /// Built-in fallback template zip URL (used when registry fetch fails).
 /// The version segment is derived from [minimumSupportedVersion].
 const String defaultTemplateZipUrl =

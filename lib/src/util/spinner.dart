@@ -26,7 +26,7 @@ import 'package:mason_logger/mason_logger.dart';
 /// no spinner should be shown (debug mode or non-terminal).
 Future<T> runWithSpinner<T>({
   required Logger logger,
-  required Translations messages,
+  required Translations translations,
   required String message,
   required Future<T> Function() work,
 }) async {
@@ -40,11 +40,11 @@ Future<T> runWithSpinner<T>({
   try {
     final result = await work();
     final label = message.trim().replaceFirst(RegExp(r'\.\.\.$'), '');
-    progress.complete(messages.spinner.stepCompleted(label: label));
+    progress.complete(translations.spinner.stepCompleted(label: label));
     return result;
   } on Object {
     final label = message.trim().replaceFirst(RegExp(r'\.\.\.$'), '');
-    progress.fail(messages.spinner.stepFailed(label: label));
+    progress.fail(translations.spinner.stepFailed(label: label));
     rethrow;
   }
 }

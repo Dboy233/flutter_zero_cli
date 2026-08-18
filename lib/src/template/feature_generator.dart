@@ -23,6 +23,7 @@ class FeatureGenerator {
   FeatureGenerator({
     required this.config,
     required this.renderer,
+    this.diTargetPath = 'lib/core/di/injection_base.dart',
     Translations? messages,
   }) : _messages = messages ?? AppLocale.zh.buildSync();
 
@@ -30,6 +31,18 @@ class FeatureGenerator {
   ///
   /// Project configuration.
   final ProjectConfig config;
+
+  /// DI 注册目标路径（相对 projectRoot）。
+  ///
+  /// 由调用方按模板版本传入：1.0.x 指向 `injection_base.dart`，
+  /// 未来大版本若移动注册位，传入对应路径即可，无需改动生成管线。
+  ///
+  /// DI registration target (relative to projectRoot).
+  ///
+  /// Passed per template version: 1.0.x points at `injection_base.dart`;
+  /// future major versions that relocate registration just pass the new path
+  /// without touching the generation pipeline.
+  final String diTargetPath;
 
   /// Brick 渲染器。
   ///
@@ -99,7 +112,7 @@ class FeatureGenerator {
   /// derived, not precomputed.
   Future<void> _registerInInjectionBase(String featureName) async {
     final injectionBase = File(
-      p.join(config.projectRoot, 'lib', 'core', 'di', 'injection_base.dart'),
+      p.join(config.projectRoot, diTargetPath),
     );
     await FeatureRegistration(featureName, messages: _messages).applyTo(injectionBase);
   }

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:fluzer/fluzer.dart';
 import 'package:fluzer/src/process/process_runner.dart';
 import 'package:path/path.dart' as p;
+import 'helpers/fake_process_runner.dart';
 import 'package:test/test.dart';
 
 /// 验证全局 `--log` 开关经 [Fluzer] 注入子命令，使 [ProcessRunner.run]
@@ -12,17 +13,14 @@ import 'package:test/test.dart';
 void main() {
   group('Fluzer --log 传播到子命令 ProcessRunner.showLive', () {
     late Directory tempDir;
-    bool? capturedShowLive;
+    late FakeProcessRunner mockRunner;
 
     setUp(() async {
-      capturedShowLive = null;
-
       // 搭建最小 flutter_zero 工程，使 gen-l10n 能走到 flutter gen-l10n 步骤。
       tempDir = await Directory.systemTemp.createTemp('fluzer_proj_');
       await File(p.join(tempDir.path, 'flutter_zero_config.yaml')).writeAsString(
         'version: 1.1.0\n'
-        'template_name: flutter_zero\n'
-        'minCliVersion: 1.0.0\n',
+        'template_name: flutter_zero\n',
       );
       await File(p.join(tempDir.path, 'pubspec.yaml')).writeAsString(
         'name: demo_app\n',
@@ -61,20 +59,9 @@ void main() {
       }
     });
 
-    /// 创建 mock [ProcessRunner] 拦截 showLive 并记录，将其注入 [Fluzer]。
+    /// 创建 FakeProcessRunner 拦截 showLive 并记录，将其注入 [Fluzer]。
     Fluzer createFluzer() {
-      final mockRunner = ProcessRunner(
-        impl: (
-          String executable,
-          List<String> args, {
-          String? workingDirectory,
-          bool showLive = false,
-          bool runInShell = false,
-        }) {
-          capturedShowLive = showLive;
-          return Future.value(0);
-        },
-      );
+      mockRunner = FakeProcessRunner();
       return Fluzer(workingDirectory: tempDir, processRunner: mockRunner);
     }
 
@@ -83,18 +70,18 @@ void main() {
     }
 
     test('--log 时 gen-l10n 的 showLive 为 true（显示子进程输出）', () async {
-      await runInProject(['--log', 'gen-l10n', '--skip-version-check']);
-      expect(capturedShowLive, isTrue);
+      await runInProject(['--log', 'gen-l10n']);
+      expect(mockRunner.calls.any((c) => c.showLive), isTrue);
     });
 
     test('无 --log 时 gen-l10n 的 showLive 为 false（隐藏子进程输出）', () async {
-      await runInProject(['gen-l10n', '--skip-version-check']);
-      expect(capturedShowLive, isFalse);
+      await runInProject(['gen-l10n']);
+      expect(mockRunner.calls.any((c) => c.showLive), isFalse);
     });
 
     test('-l 缩写同样生效（showLive 为 true）', () async {
-      await runInProject(['-l', 'gen-l10n', '--skip-version-check']);
-      expect(capturedShowLive, isTrue);
+      await runInProject(['-l', 'gen-l10n']);
+      expect(mockRunner.calls.any((c) => c.showLive), isTrue);
     });
   });
 }

@@ -47,6 +47,12 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 	late final Translations$l10nParser$zh l10nParser = Translations$l10nParser$zh._(_root);
 	late final Translations$spinner$zh spinner = Translations$spinner$zh._(_root);
 	late final Translations$config$zh config = Translations$config$zh._(_root);
+
+	/// zh: '模板版本 $version 超出当前 fluzer 支持范围（最高 $maxSupported）。请更新 fluzer：dart pub global activate fluzer'
+	String unsupportedTooNew({required Object version, required Object maxSupported}) => '模板版本 ${version} 超出当前 fluzer 支持范围（最高 ${maxSupported}）。请更新 fluzer：dart pub global activate fluzer';
+
+	/// zh: '模板版本 $version 过低，当前 fluzer 不支持，请升级项目模板或 fluzer。'
+	String unsupportedTooOld({required Object version}) => '模板版本 ${version} 过低，当前 fluzer 不支持，请升级项目模板或 fluzer。';
 }
 
 // Path: app
@@ -87,23 +93,23 @@ class Translations$create$zh {
 	/// zh: '错误：请指定项目名'
 	String get nameRequired => '错误：请指定项目名';
 
-	/// zh: '步骤 1/6：校验项目名与目录 ...'
-	String get step1Validate => '步骤 1/6：校验项目名与目录 ...';
+	/// zh: '校验项目名与目录'
+	String get step1Validate => '校验项目名与目录';
 
-	/// zh: '步骤 2/6：用 Mason 渲染 project 模板 ...'
-	String get step2Render => '步骤 2/6：用 Mason 渲染 project 模板 ...';
+	/// zh: '用 Mason 渲染 project 模板'
+	String get step2Render => '用 Mason 渲染 project 模板';
 
-	/// zh: '步骤 3/6：执行 flutter create . ...'
-	String get step3FlutterCreate => '步骤 3/6：执行 flutter create . ...';
+	/// zh: '执行 flutter create .'
+	String get step3FlutterCreate => '执行 flutter create .';
 
-	/// zh: '步骤 4/6：清理 flutter create 生成的多余测试文件 ...'
-	String get step4CleanTest => '步骤 4/6：清理 flutter create 生成的多余测试文件 ...';
+	/// zh: '清理 flutter create 生成的多余测试文件'
+	String get step4CleanTest => '清理 flutter create 生成的多余测试文件';
 
-	/// zh: '步骤 5/6：执行 flutter pub get ...'
-	String get step5PubGet => '步骤 5/6：执行 flutter pub get ...';
+	/// zh: '执行 flutter pub get'
+	String get step5PubGet => '执行 flutter pub get';
 
-	/// zh: '步骤 6/6：执行 flutter gen-l10n ...'
-	String get step6GenL10n => '步骤 6/6：执行 flutter gen-l10n ...';
+	/// zh: '执行 flutter gen-l10n'
+	String get step6GenL10n => '执行 flutter gen-l10n';
 
 	/// zh: ' 项目名: $name, 组织: $org'
 	String detailProject({required Object name, required Object org}) => '  项目名: ${name}, 组织: ${org}';
@@ -171,23 +177,17 @@ class Translations$feature$zh {
 	/// zh: '生成后是否运行 build_runner'
 	String get buildRunnerHelp => '生成后是否运行 build_runner';
 
-	/// zh: '跳过项目模板版本与 CLI 版本兼容门禁'
-	String get skipVersionCheckHelp => '跳过项目模板版本与 CLI 版本兼容门禁';
+	/// zh: '加载项目配置'
+	String get step1Load => '加载项目配置';
 
-	/// zh: ' 项目模板版本：$version，要求 CLI >= $minCliVersion'
-	String versionGateDetail({required Object version, required Object minCliVersion}) => '  项目模板版本：${version}，要求 CLI >= ${minCliVersion}';
+	/// zh: '解析模板加载器（本地或远程下载）'
+	String get step2Template => '解析模板加载器（本地或远程下载）';
 
-	/// zh: '步骤 1/4：加载项目配置与版本门禁 ...'
-	String get step1Load => '步骤 1/4：加载项目配置与版本门禁 ...';
+	/// zh: '生成功能模块 $feature'
+	String step3Generate({required Object feature}) => '生成功能模块 ${feature}';
 
-	/// zh: '步骤 2/4：解析模板加载器（本地或远程下载）...'
-	String get step2Template => '步骤 2/4：解析模板加载器（本地或远程下载）...';
-
-	/// zh: '步骤 3/4：生成功能模块 $feature ...'
-	String step3Generate({required Object feature}) => '步骤 3/4：生成功能模块 ${feature} ...';
-
-	/// zh: '步骤 4/4：运行 build_runner ...'
-	String get step4BuildRunner => '步骤 4/4：运行 build_runner ...';
+	/// zh: '运行 build_runner'
+	String get step4BuildRunner => '运行 build_runner';
 
 	/// zh: ' 项目根目录: $path'
 	String detailProjectRoot({required Object path}) => '  项目根目录: ${path}';
@@ -231,23 +231,23 @@ class Translations$genL10n$zh {
 	/// zh: '生成国际化代码并自动创建 L10nCode 类'
 	String get description => '生成国际化代码并自动创建 L10nCode 类';
 
-	/// zh: '步骤 1/6：校验项目与版本门禁 ...'
-	String get step1Validate => '步骤 1/6：校验项目与版本门禁 ...';
+	/// zh: '校验项目'
+	String get step1Validate => '校验项目';
 
-	/// zh: '步骤 2/6：解析 l10n.yaml 与 ARB 目录 ...'
-	String get step2Parse => '步骤 2/6：解析 l10n.yaml 与 ARB 目录 ...';
+	/// zh: '解析 l10n.yaml 与 ARB 目录'
+	String get step2Parse => '解析 l10n.yaml 与 ARB 目录';
 
-	/// zh: '步骤 3/6：执行 flutter gen-l10n ...'
-	String get step3GenL10n => '步骤 3/6：执行 flutter gen-l10n ...';
+	/// zh: '执行 flutter gen-l10n'
+	String get step3GenL10n => '执行 flutter gen-l10n';
 
-	/// zh: '步骤 4/6：解析本地化成员 ...'
-	String get step4Members => '步骤 4/6：解析本地化成员 ...';
+	/// zh: '解析本地化成员'
+	String get step4Members => '解析本地化成员';
 
-	/// zh: '步骤 5/6：生成 L10nCode 等文件 ...'
-	String get step5Generate => '步骤 5/6：生成 L10nCode 等文件 ...';
+	/// zh: '生成 L10nCode 等文件'
+	String get step5Generate => '生成 L10nCode 等文件';
 
-	/// zh: '步骤 6/6：接线 defaultToastHandle ...'
-	String get step6Wire => '步骤 6/6：接线 defaultToastHandle ...';
+	/// zh: '接线 defaultToastHandle'
+	String get step6Wire => '接线 defaultToastHandle';
 
 	/// zh: ' 成员: $names'
 	String detailMembers({required Object names}) => '  成员: ${names}';
@@ -266,9 +266,6 @@ class Translations$genL10n$zh {
 
 	/// zh: 'l10nCode 分支已被自定义时也强制覆盖'
 	String get forceHandlePatchHelp => 'l10nCode 分支已被自定义时也强制覆盖';
-
-	/// zh: '跳过项目模板版本与 CLI 版本兼容门禁'
-	String get skipVersionCheckHelp => '跳过项目模板版本与 CLI 版本兼容门禁';
 
 	/// zh: '未找到 $dir 目录，请确保项目已配置国际化。'
 	String arbDirNotFound({required Object dir}) => '未找到 ${dir} 目录，请确保项目已配置国际化。';
@@ -368,9 +365,6 @@ class Translations$version$zh {
 
 	/// zh: '已是最新版本'
 	String get alreadyLatest => '已是最新版本';
-
-	/// zh: '当前 CLI 版本 $cliVersion 过低，项目模板 $version 需要 CLI >= $minCliVersion。请升级 fluzer 后重试，或确认项目配置。'
-	String gateTooLow({required Object cliVersion, required Object version, required Object minCliVersion}) => '当前 CLI 版本 ${cliVersion} 过低，项目模板 ${version} 需要 CLI >= ${minCliVersion}。请升级 fluzer 后重试，或确认项目配置。';
 
 	/// zh: '发现新版本 $latest，运行 dart pub global activate fluzer 升级'
 	String updateHint({required Object latest}) => '发现新版本 ${latest}，运行 dart pub global activate fluzer 升级';
@@ -543,6 +537,9 @@ class Translations$spinner$zh {
 
 	// Translations
 
+	/// zh: '步骤 $index/$total'
+	String stepLabel({required Object index, required Object total}) => '步骤 ${index}/${total}';
+
 	/// zh: '$label 完成'
 	String stepCompleted({required Object label}) => '${label} 完成';
 
@@ -567,9 +564,6 @@ class Translations$config$zh {
 	/// zh: '$fileName 中缺少有效的 version 字段。'
 	String missingVersion({required Object fileName}) => '${fileName} 中缺少有效的 version 字段。';
 
-	/// zh: '模板版本 $version 过低，请使用 >= $minimumSupportedVersion 的项目模板。'
-	String versionTooOld({required Object version, required Object minimumSupportedVersion}) => '模板版本 ${version} 过低，请使用 >= ${minimumSupportedVersion} 的项目模板。';
-
 	/// zh: '$fileName 中 template_name 必须是 "flutter_zero"。'
 	String templateNameInvalid({required Object fileName}) => '${fileName} 中 template_name 必须是 "flutter_zero"。';
 
@@ -578,12 +572,6 @@ class Translations$config$zh {
 
 	/// zh: 'pubspec.yaml 中缺少有效的 name 字段。'
 	String get missingPubspecName => 'pubspec.yaml 中缺少有效的 name 字段。';
-
-	/// zh: '项目目录缺少 lib/ 目录，无法识别为 Flutter 项目。'
-	String get missingLib => '项目目录缺少 lib/ 目录，无法识别为 Flutter 项目。';
-
-	/// zh: '未找到 lib/core/di/injection_base.dart，无法自动注册模块。'
-	String get missingInjectionBase => '未找到 lib/core/di/injection_base.dart，无法自动注册模块。';
 }
 
 /// The flat map containing all translations for locale <zh>.
@@ -601,12 +589,12 @@ extension on Translations {
 			'create.description' => '从模板创建全新 Flutter 项目',
 			'create.orgHelp' => '组织标识（影响 bundle ID）',
 			'create.nameRequired' => '错误：请指定项目名',
-			'create.step1Validate' => '步骤 1/6：校验项目名与目录 ...',
-			'create.step2Render' => '步骤 2/6：用 Mason 渲染 project 模板 ...',
-			'create.step3FlutterCreate' => '步骤 3/6：执行 flutter create . ...',
-			'create.step4CleanTest' => '步骤 4/6：清理 flutter create 生成的多余测试文件 ...',
-			'create.step5PubGet' => '步骤 5/6：执行 flutter pub get ...',
-			'create.step6GenL10n' => '步骤 6/6：执行 flutter gen-l10n ...',
+			'create.step1Validate' => '校验项目名与目录',
+			'create.step2Render' => '用 Mason 渲染 project 模板',
+			'create.step3FlutterCreate' => '执行 flutter create .',
+			'create.step4CleanTest' => '清理 flutter create 生成的多余测试文件',
+			'create.step5PubGet' => '执行 flutter pub get',
+			'create.step6GenL10n' => '执行 flutter gen-l10n',
 			'create.detailProject' => ({required Object name, required Object org}) => '  项目名: ${name}, 组织: ${org}',
 			'create.detailGenerated' => ({required Object path}) => '  已生成 ${path}',
 			'create.created' => '项目创建完成！',
@@ -626,12 +614,10 @@ extension on Translations {
 			'feature.nameRequired' => '错误：请指定功能名',
 			'feature.featureNameEmpty' => '功能名不能为空。',
 			'feature.buildRunnerHelp' => '生成后是否运行 build_runner',
-			'feature.skipVersionCheckHelp' => '跳过项目模板版本与 CLI 版本兼容门禁',
-			'feature.versionGateDetail' => ({required Object version, required Object minCliVersion}) => '  项目模板版本：${version}，要求 CLI >= ${minCliVersion}',
-			'feature.step1Load' => '步骤 1/4：加载项目配置与版本门禁 ...',
-			'feature.step2Template' => '步骤 2/4：解析模板加载器（本地或远程下载）...',
-			'feature.step3Generate' => ({required Object feature}) => '步骤 3/4：生成功能模块 ${feature} ...',
-			'feature.step4BuildRunner' => '步骤 4/4：运行 build_runner ...',
+			'feature.step1Load' => '加载项目配置',
+			'feature.step2Template' => '解析模板加载器（本地或远程下载）',
+			'feature.step3Generate' => ({required Object feature}) => '生成功能模块 ${feature}',
+			'feature.step4BuildRunner' => '运行 build_runner',
 			'feature.detailProjectRoot' => ({required Object path}) => '  项目根目录: ${path}',
 			'feature.detailPinnedVersion' => ({required Object version}) => '  按项目模板版本 ${version} 钉死下载源',
 			'feature.detailGenerated' => ({required Object feature}) => '  已生成功能模块 ${feature}',
@@ -643,19 +629,18 @@ extension on Translations {
 			'feature.featureExists' => ({required Object feature}) => '功能模块 ${feature} 已存在。',
 			'feature.featureNameInvalid' => '功能名必须是 snake_case 且以小写字母开头，例如 user_profile。',
 			'genL10n.description' => '生成国际化代码并自动创建 L10nCode 类',
-			'genL10n.step1Validate' => '步骤 1/6：校验项目与版本门禁 ...',
-			'genL10n.step2Parse' => '步骤 2/6：解析 l10n.yaml 与 ARB 目录 ...',
-			'genL10n.step3GenL10n' => '步骤 3/6：执行 flutter gen-l10n ...',
-			'genL10n.step4Members' => '步骤 4/6：解析本地化成员 ...',
-			'genL10n.step5Generate' => '步骤 5/6：生成 L10nCode 等文件 ...',
-			'genL10n.step6Wire' => '步骤 6/6：接线 defaultToastHandle ...',
+			'genL10n.step1Validate' => '校验项目',
+			'genL10n.step2Parse' => '解析 l10n.yaml 与 ARB 目录',
+			'genL10n.step3GenL10n' => '执行 flutter gen-l10n',
+			'genL10n.step4Members' => '解析本地化成员',
+			'genL10n.step5Generate' => '生成 L10nCode 等文件',
+			'genL10n.step6Wire' => '接线 defaultToastHandle',
 			'genL10n.detailMembers' => ({required Object names}) => '  成员: ${names}',
 			'genL10n.generated' => ({required Object path}) => '已生成：${path}',
 			'genL10n.failed' => ({required Object error}) => 'gen-l10n 执行失败：${error}',
 			'genL10n.alreadyWired' => 'defaultToastHandle 已接线，跳过（幂等）',
 			'genL10n.skipHandlePatchHelp' => '跳过 defaultToastHandle 自动接线',
 			'genL10n.forceHandlePatchHelp' => 'l10nCode 分支已被自定义时也强制覆盖',
-			'genL10n.skipVersionCheckHelp' => '跳过项目模板版本与 CLI 版本兼容门禁',
 			'genL10n.arbDirNotFound' => ({required Object dir}) => '未找到 ${dir} 目录，请确保项目已配置国际化。',
 			'genL10n.noArbFiles' => ({required Object dir}) => '${dir} 目录中没有找到 .arb 文件。',
 			'genL10n.foundArbFiles' => ({required Object count}) => '找到 ${count} 个 .arb 文件',
@@ -683,7 +668,6 @@ extension on Translations {
 			'version.checkUnavailable' => '（无法检查更新：包尚未发布或网络异常）',
 			'version.newVersionFound' => ({required Object latest}) => '发现新版本 ${latest}，运行以下命令升级：',
 			'version.alreadyLatest' => '已是最新版本',
-			'version.gateTooLow' => ({required Object cliVersion, required Object version, required Object minCliVersion}) => '当前 CLI 版本 ${cliVersion} 过低，项目模板 ${version} 需要 CLI >= ${minCliVersion}。请升级 fluzer 后重试，或确认项目配置。',
 			'version.updateHint' => ({required Object latest}) => '发现新版本 ${latest}，运行 dart pub global activate fluzer 升级',
 			'template.localTemplateNotFound' => ({required Object path}) => '本地模板不存在：\n${path}',
 			'template.remoteBrickNotFound' => ({required Object brickName}) => '远程模板中未找到 brick：${brickName}',
@@ -723,17 +707,17 @@ extension on Translations {
 			'l10nParser.classBodyUnclosed' => ({required Object name}) => '${name} 类体未闭合。',
 			'l10nParser.classNotFound' => ({required Object name}) => '未找到 abstract class ${name} 声明，请检查 l10n.yaml 的 output-class 配置。',
 			'l10nParser.paramParseFailed' => ({required Object member, required Object param}) => '无法解析成员 ${member} 的参数声明: "${param}"。',
+			'spinner.stepLabel' => ({required Object index, required Object total}) => '步骤 ${index}/${total}',
 			'spinner.stepCompleted' => ({required Object label}) => '${label} 完成',
 			'spinner.stepFailed' => ({required Object label}) => '${label} 失败',
 			'config.notFound' => ({required Object fileName}) => '未找到 ${fileName}，请确保在 flutter_zero 模板项目根目录下执行命令。',
 			'config.rootNotMap' => ({required Object fileName}) => '${fileName} 格式错误：根节点必须是 Map。',
 			'config.missingVersion' => ({required Object fileName}) => '${fileName} 中缺少有效的 version 字段。',
-			'config.versionTooOld' => ({required Object version, required Object minimumSupportedVersion}) => '模板版本 ${version} 过低，请使用 >= ${minimumSupportedVersion} 的项目模板。',
 			'config.templateNameInvalid' => ({required Object fileName}) => '${fileName} 中 template_name 必须是 "flutter_zero"。',
 			'config.missingPubspec' => '项目目录缺少 pubspec.yaml。',
 			'config.missingPubspecName' => 'pubspec.yaml 中缺少有效的 name 字段。',
-			'config.missingLib' => '项目目录缺少 lib/ 目录，无法识别为 Flutter 项目。',
-			'config.missingInjectionBase' => '未找到 lib/core/di/injection_base.dart，无法自动注册模块。',
+			'unsupportedTooNew' => ({required Object version, required Object maxSupported}) => '模板版本 ${version} 超出当前 fluzer 支持范围（最高 ${maxSupported}）。请更新 fluzer：dart pub global activate fluzer',
+			'unsupportedTooOld' => ({required Object version}) => '模板版本 ${version} 过低，当前 fluzer 不支持，请升级项目模板或 fluzer。',
 			_ => null,
 		};
 	}

@@ -49,6 +49,8 @@ class TranslationsEn with BaseTranslations<AppLocale, Translations> implements T
 	@override late final _Translations$l10nParser$en l10nParser = _Translations$l10nParser$en._(_root);
 	@override late final _Translations$spinner$en spinner = _Translations$spinner$en._(_root);
 	@override late final _Translations$config$en config = _Translations$config$en._(_root);
+	@override String unsupportedTooNew({required Object version, required Object maxSupported}) => 'Template version ${version} is outside the supported range of the current fluzer (max ${maxSupported}). Please update fluzer: dart pub global activate fluzer';
+	@override String unsupportedTooOld({required Object version}) => 'Template version ${version} is too old and not supported by the current fluzer. Please upgrade the template or fluzer.';
 }
 
 // Path: app
@@ -74,12 +76,12 @@ class _Translations$create$en implements Translations$create$zh {
 	@override String get description => 'Create a new Flutter project from the template';
 	@override String get orgHelp => 'Organization identifier (affects bundle ID)';
 	@override String get nameRequired => 'Error: please specify a project name';
-	@override String get step1Validate => 'Step 1/6: validate project name and directory ...';
-	@override String get step2Render => 'Step 2/6: render project template with Mason ...';
-	@override String get step3FlutterCreate => 'Step 3/6: run flutter create . ...';
-	@override String get step4CleanTest => 'Step 4/6: clean up extra test files from flutter create ...';
-	@override String get step5PubGet => 'Step 5/6: run flutter pub get ...';
-	@override String get step6GenL10n => 'Step 6/6: run flutter gen-l10n ...';
+	@override String get step1Validate => 'Validate project name and directory';
+	@override String get step2Render => 'Render project template with Mason';
+	@override String get step3FlutterCreate => 'Run flutter create .';
+	@override String get step4CleanTest => 'Clean up extra test files from flutter create';
+	@override String get step5PubGet => 'Run flutter pub get';
+	@override String get step6GenL10n => 'Run flutter gen-l10n';
 	@override String detailProject({required Object name, required Object org}) => '  Project name: ${name}, org: ${org}';
 	@override String detailGenerated({required Object path}) => '  Generated ${path}';
 	@override String get created => 'Project created successfully!';
@@ -108,12 +110,10 @@ class _Translations$feature$en implements Translations$feature$zh {
 	@override String get nameRequired => 'Error: please specify a feature name';
 	@override String get featureNameEmpty => 'Feature name cannot be empty.';
 	@override String get buildRunnerHelp => 'Whether to run build_runner after generation';
-	@override String get skipVersionCheckHelp => 'Skip the project-template/CLI version compatibility gate';
-	@override String versionGateDetail({required Object version, required Object minCliVersion}) => '  Project template version: ${version}, requires CLI >= ${minCliVersion}';
-	@override String get step1Load => 'Step 1/4: load project config and version gate ...';
-	@override String get step2Template => 'Step 2/4: resolve template loader (local or remote download)...';
-	@override String step3Generate({required Object feature}) => 'Step 3/4: generate feature module ${feature} ...';
-	@override String get step4BuildRunner => 'Step 4/4: run build_runner ...';
+	@override String get step1Load => 'load project config';
+	@override String get step2Template => 'resolve template loader (local or remote download)';
+	@override String step3Generate({required Object feature}) => 'generate feature module ${feature}';
+	@override String get step4BuildRunner => 'run build_runner';
 	@override String detailProjectRoot({required Object path}) => '  Project root: ${path}';
 	@override String detailPinnedVersion({required Object version}) => '  Pinned download source to project template version ${version}';
 	@override String detailGenerated({required Object feature}) => '  Generated feature module ${feature}';
@@ -134,19 +134,18 @@ class _Translations$genL10n$en implements Translations$genL10n$zh {
 
 	// Translations
 	@override String get description => 'Generate localization code and create L10nCode class';
-	@override String get step1Validate => 'Step 1/6: validate project and version gate ...';
-	@override String get step2Parse => 'Step 2/6: parse l10n.yaml and ARB directory ...';
-	@override String get step3GenL10n => 'Step 3/6: run flutter gen-l10n ...';
-	@override String get step4Members => 'Step 4/6: parse localization members ...';
-	@override String get step5Generate => 'Step 5/6: generate L10nCode and other files ...';
-	@override String get step6Wire => 'Step 6/6: wire defaultToastHandle ...';
+	@override String get step1Validate => 'validate project';
+	@override String get step2Parse => 'parse l10n.yaml and ARB directory';
+	@override String get step3GenL10n => 'run flutter gen-l10n';
+	@override String get step4Members => 'parse localization members';
+	@override String get step5Generate => 'generate L10nCode and other files';
+	@override String get step6Wire => 'wire defaultToastHandle';
 	@override String detailMembers({required Object names}) => '  Members: ${names}';
 	@override String generated({required Object path}) => 'Generated: ${path}';
 	@override String failed({required Object error}) => 'gen-l10n failed: ${error}';
 	@override String get alreadyWired => 'Already wired, skipped (idempotent)';
 	@override String get skipHandlePatchHelp => 'Skip patching defaultToastHandle';
 	@override String get forceHandlePatchHelp => 'Overwrite even if the l10nCode branch was customized';
-	@override String get skipVersionCheckHelp => 'Skip the project-template/CLI version compatibility gate';
 	@override String arbDirNotFound({required Object dir}) => 'Could not find ${dir} directory. Make sure l10n is configured.';
 	@override String noArbFiles({required Object dir}) => 'No .arb files found in ${dir}.';
 	@override String foundArbFiles({required Object count}) => 'Found ${count} .arb file(s)';
@@ -192,7 +191,6 @@ class _Translations$version$en implements Translations$version$zh {
 	@override String get checkUnavailable => '(Unable to check for updates: package not published or network error)';
 	@override String newVersionFound({required Object latest}) => 'New version ${latest} found. Upgrade with:';
 	@override String get alreadyLatest => 'Already up to date';
-	@override String gateTooLow({required Object cliVersion, required Object version, required Object minCliVersion}) => 'Current CLI version ${cliVersion} is too low; project template ${version} requires CLI >= ${minCliVersion}. Please upgrade fluzer or check the project config.';
 	@override String updateHint({required Object latest}) => 'New version ${latest} found. Upgrade with: dart pub global activate fluzer';
 }
 
@@ -286,6 +284,7 @@ class _Translations$spinner$en implements Translations$spinner$zh {
 	final TranslationsEn _root; // ignore: unused_field
 
 	// Translations
+	@override String stepLabel({required Object index, required Object total}) => 'Step ${index}/${total}';
 	@override String stepCompleted({required Object label}) => '${label} completed';
 	@override String stepFailed({required Object label}) => '${label} failed';
 }
@@ -300,12 +299,9 @@ class _Translations$config$en implements Translations$config$zh {
 	@override String notFound({required Object fileName}) => 'Could not find ${fileName}. Make sure you run this command from a flutter_zero template project root.';
 	@override String rootNotMap({required Object fileName}) => 'Invalid ${fileName}: root must be a Map.';
 	@override String missingVersion({required Object fileName}) => 'Missing valid "version" field in ${fileName}.';
-	@override String versionTooOld({required Object version, required Object minimumSupportedVersion}) => 'Template version ${version} is too old. Please use a project template >= ${minimumSupportedVersion}.';
 	@override String templateNameInvalid({required Object fileName}) => 'The "template_name" field in ${fileName} must be "flutter_zero".';
 	@override String get missingPubspec => 'Missing pubspec.yaml in project root.';
 	@override String get missingPubspecName => 'Missing valid "name" field in pubspec.yaml.';
-	@override String get missingLib => 'Missing lib/ directory in project root. Not a recognized Flutter project.';
-	@override String get missingInjectionBase => 'Could not find lib/core/di/injection_base.dart. Automatic module registration is unavailable.';
 }
 
 /// The flat map containing all translations for locale <en>.
@@ -323,12 +319,12 @@ extension on TranslationsEn {
 			'create.description' => 'Create a new Flutter project from the template',
 			'create.orgHelp' => 'Organization identifier (affects bundle ID)',
 			'create.nameRequired' => 'Error: please specify a project name',
-			'create.step1Validate' => 'Step 1/6: validate project name and directory ...',
-			'create.step2Render' => 'Step 2/6: render project template with Mason ...',
-			'create.step3FlutterCreate' => 'Step 3/6: run flutter create . ...',
-			'create.step4CleanTest' => 'Step 4/6: clean up extra test files from flutter create ...',
-			'create.step5PubGet' => 'Step 5/6: run flutter pub get ...',
-			'create.step6GenL10n' => 'Step 6/6: run flutter gen-l10n ...',
+			'create.step1Validate' => 'Validate project name and directory',
+			'create.step2Render' => 'Render project template with Mason',
+			'create.step3FlutterCreate' => 'Run flutter create .',
+			'create.step4CleanTest' => 'Clean up extra test files from flutter create',
+			'create.step5PubGet' => 'Run flutter pub get',
+			'create.step6GenL10n' => 'Run flutter gen-l10n',
 			'create.detailProject' => ({required Object name, required Object org}) => '  Project name: ${name}, org: ${org}',
 			'create.detailGenerated' => ({required Object path}) => '  Generated ${path}',
 			'create.created' => 'Project created successfully!',
@@ -348,12 +344,10 @@ extension on TranslationsEn {
 			'feature.nameRequired' => 'Error: please specify a feature name',
 			'feature.featureNameEmpty' => 'Feature name cannot be empty.',
 			'feature.buildRunnerHelp' => 'Whether to run build_runner after generation',
-			'feature.skipVersionCheckHelp' => 'Skip the project-template/CLI version compatibility gate',
-			'feature.versionGateDetail' => ({required Object version, required Object minCliVersion}) => '  Project template version: ${version}, requires CLI >= ${minCliVersion}',
-			'feature.step1Load' => 'Step 1/4: load project config and version gate ...',
-			'feature.step2Template' => 'Step 2/4: resolve template loader (local or remote download)...',
-			'feature.step3Generate' => ({required Object feature}) => 'Step 3/4: generate feature module ${feature} ...',
-			'feature.step4BuildRunner' => 'Step 4/4: run build_runner ...',
+			'feature.step1Load' => 'load project config',
+			'feature.step2Template' => 'resolve template loader (local or remote download)',
+			'feature.step3Generate' => ({required Object feature}) => 'generate feature module ${feature}',
+			'feature.step4BuildRunner' => 'run build_runner',
 			'feature.detailProjectRoot' => ({required Object path}) => '  Project root: ${path}',
 			'feature.detailPinnedVersion' => ({required Object version}) => '  Pinned download source to project template version ${version}',
 			'feature.detailGenerated' => ({required Object feature}) => '  Generated feature module ${feature}',
@@ -365,19 +359,18 @@ extension on TranslationsEn {
 			'feature.featureExists' => ({required Object feature}) => 'Feature module ${feature} already exists.',
 			'feature.featureNameInvalid' => 'Feature name must be snake_case and start with a lowercase letter, e.g. user_profile.',
 			'genL10n.description' => 'Generate localization code and create L10nCode class',
-			'genL10n.step1Validate' => 'Step 1/6: validate project and version gate ...',
-			'genL10n.step2Parse' => 'Step 2/6: parse l10n.yaml and ARB directory ...',
-			'genL10n.step3GenL10n' => 'Step 3/6: run flutter gen-l10n ...',
-			'genL10n.step4Members' => 'Step 4/6: parse localization members ...',
-			'genL10n.step5Generate' => 'Step 5/6: generate L10nCode and other files ...',
-			'genL10n.step6Wire' => 'Step 6/6: wire defaultToastHandle ...',
+			'genL10n.step1Validate' => 'validate project',
+			'genL10n.step2Parse' => 'parse l10n.yaml and ARB directory',
+			'genL10n.step3GenL10n' => 'run flutter gen-l10n',
+			'genL10n.step4Members' => 'parse localization members',
+			'genL10n.step5Generate' => 'generate L10nCode and other files',
+			'genL10n.step6Wire' => 'wire defaultToastHandle',
 			'genL10n.detailMembers' => ({required Object names}) => '  Members: ${names}',
 			'genL10n.generated' => ({required Object path}) => 'Generated: ${path}',
 			'genL10n.failed' => ({required Object error}) => 'gen-l10n failed: ${error}',
 			'genL10n.alreadyWired' => 'Already wired, skipped (idempotent)',
 			'genL10n.skipHandlePatchHelp' => 'Skip patching defaultToastHandle',
 			'genL10n.forceHandlePatchHelp' => 'Overwrite even if the l10nCode branch was customized',
-			'genL10n.skipVersionCheckHelp' => 'Skip the project-template/CLI version compatibility gate',
 			'genL10n.arbDirNotFound' => ({required Object dir}) => 'Could not find ${dir} directory. Make sure l10n is configured.',
 			'genL10n.noArbFiles' => ({required Object dir}) => 'No .arb files found in ${dir}.',
 			'genL10n.foundArbFiles' => ({required Object count}) => 'Found ${count} .arb file(s)',
@@ -405,7 +398,6 @@ extension on TranslationsEn {
 			'version.checkUnavailable' => '(Unable to check for updates: package not published or network error)',
 			'version.newVersionFound' => ({required Object latest}) => 'New version ${latest} found. Upgrade with:',
 			'version.alreadyLatest' => 'Already up to date',
-			'version.gateTooLow' => ({required Object cliVersion, required Object version, required Object minCliVersion}) => 'Current CLI version ${cliVersion} is too low; project template ${version} requires CLI >= ${minCliVersion}. Please upgrade fluzer or check the project config.',
 			'version.updateHint' => ({required Object latest}) => 'New version ${latest} found. Upgrade with: dart pub global activate fluzer',
 			'template.localTemplateNotFound' => ({required Object path}) => 'Local template not found:\n${path}',
 			'template.remoteBrickNotFound' => ({required Object brickName}) => 'Brick not found in remote templates: ${brickName}',
@@ -445,17 +437,17 @@ extension on TranslationsEn {
 			'l10nParser.classBodyUnclosed' => ({required Object name}) => 'Class body of ${name} is not closed.',
 			'l10nParser.classNotFound' => ({required Object name}) => 'Declaration "abstract class ${name}" not found. Check "output-class" in l10n.yaml.',
 			'l10nParser.paramParseFailed' => ({required Object param, required Object member}) => 'Unable to parse parameter "${param}" of member "${member}".',
+			'spinner.stepLabel' => ({required Object index, required Object total}) => 'Step ${index}/${total}',
 			'spinner.stepCompleted' => ({required Object label}) => '${label} completed',
 			'spinner.stepFailed' => ({required Object label}) => '${label} failed',
 			'config.notFound' => ({required Object fileName}) => 'Could not find ${fileName}. Make sure you run this command from a flutter_zero template project root.',
 			'config.rootNotMap' => ({required Object fileName}) => 'Invalid ${fileName}: root must be a Map.',
 			'config.missingVersion' => ({required Object fileName}) => 'Missing valid "version" field in ${fileName}.',
-			'config.versionTooOld' => ({required Object version, required Object minimumSupportedVersion}) => 'Template version ${version} is too old. Please use a project template >= ${minimumSupportedVersion}.',
 			'config.templateNameInvalid' => ({required Object fileName}) => 'The "template_name" field in ${fileName} must be "flutter_zero".',
 			'config.missingPubspec' => 'Missing pubspec.yaml in project root.',
 			'config.missingPubspecName' => 'Missing valid "name" field in pubspec.yaml.',
-			'config.missingLib' => 'Missing lib/ directory in project root. Not a recognized Flutter project.',
-			'config.missingInjectionBase' => 'Could not find lib/core/di/injection_base.dart. Automatic module registration is unavailable.',
+			'unsupportedTooNew' => ({required Object version, required Object maxSupported}) => 'Template version ${version} is outside the supported range of the current fluzer (max ${maxSupported}). Please update fluzer: dart pub global activate fluzer',
+			'unsupportedTooOld' => ({required Object version}) => 'Template version ${version} is too old and not supported by the current fluzer. Please upgrade the template or fluzer.',
 			_ => null,
 		};
 	}
