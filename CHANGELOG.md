@@ -1,3 +1,14 @@
+## 2.0.0
+
+### Removed
+
+- Removed the CLI/template version compatibility gate from the `new` and `gen-l10n` commands. These commands no longer read the `minCliVersion` field from `flutter_zero_config.yaml` to reject or allow a CLI version, and the `--skip-version-check` flag (debug-only bypass) has been removed as it is no longer needed.
+
+### Changed
+
+- `create` now always selects the latest available template version instead of filtering candidates by a minimum CLI version.
+- Refined and unified the localized (zh/en/ja) prompt text across template-source resolution, cache operations, and the version-update notice; stale comments were cleaned up.
+
 ## 1.2.1
 
 ### Fixed
